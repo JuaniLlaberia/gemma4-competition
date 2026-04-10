@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, END
+from langchain_core.callbacks import adispatch_custom_event
 from typing import TypedDict, Dict, List, Any, Literal
 
 from .models.output import ExtractorOutput, NormalizatorOutput, RankerOutput
@@ -54,7 +55,7 @@ class Extractor:
 
         return graph.compile()
     
-    def _claims_extraction_node(self, state: State) -> Dict[str, Any]:
+    async def _claims_extraction_node(self, state: State) -> Dict[str, Any]:
         """
         Handles the claims extraction from given text.
 
@@ -63,23 +64,34 @@ class Extractor:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        response = self.gemma.invoke_model(prompt=EXTRACTION_PROMPT,
-                                           output_schema=ExtractorOutput,
-                                           input={"text": state["text"]})
+        response = await self.gemma.ainvoke_model(prompt=EXTRACTION_PROMPT,
+                                                  output_schema=ExtractorOutput,
+                                                  input={"text": state["text"]})
         
         if isinstance(response, ExtractorOutput):
             data = {
                 "claims": response.claims
             }
+        elif isinstance(response, dict) and response.get("error"):
+            data = {"claims": []}
         else:
             response_data = response.model_dump()
             data = {
                 "claims": response_data.get("claims", []),
             }
 
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "...",
+                "message": f"{len(data['claims'])} claims have been extracted",
+                "claims_amount": len(data["claims"])
+            }
+        )
+
         return {"raw_claims": data["claims"]}
 
-    def _claims_amount_router(self, state: State) -> Literal["continue", "end"]:
+    async def _claims_amount_router(self, state: State) -> Literal["continue", "end"]:
         """
         Router node to validate quantity of extracted claims.
 
@@ -90,7 +102,7 @@ class Extractor:
         """
         return "continue" if len(state["raw_claims"]) >= 1 else "end"
 
-    def _claims_normalization(self, state: State) -> Dict[str, Any]:
+    async def _claims_normalization(self, state: State) -> Dict[str, Any]:
         """
         Handles claims normalization and decomposition.
         
@@ -99,25 +111,36 @@ class Extractor:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        response = self.gemma.invoke_model(prompt=NORMALIZATION_PROMPT,
-                                           output_schema=NormalizatorOutput,
-                                           input={"raw_claims": state["raw_claims"]})
+        response = await self.gemma.ainvoke_model(prompt=NORMALIZATION_PROMPT,
+                                                  output_schema=NormalizatorOutput,
+                                                  input={"raw_claims": state["raw_claims"]})
         
         if isinstance(response, NormalizatorOutput):
             data = {
                 "claims": response.claims
             }
+        elif isinstance(response, dict) and response.get("error"):
+            data = {"claims": []}
         else:
             response_data = response.model_dump()
             data = {
-                "claims": response_data.get("claims", [])
+                "claims": response_data.get("claims", []),
             }
+
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "...",
+                "message": f"{len(data['claims'])} claims after normalization",
+                "claims_amount": len(data["claims"])
+            }
+        )
 
         return {
             "raw_claims": data["claims"]
         }
 
-    def _claims_ranking(self, state: State) -> Dict[str, Any]:
+    async def _claims_ranking(self, state: State) -> Dict[str, Any]:
         """
         Handles claims ranking by relevance and string preparation to be a 'Claim' object.
 
@@ -126,27 +149,37 @@ class Extractor:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        response = self.gemma.invoke_model(prompt=RANKING_PROMPT,
-                                           output_schema=RankerOutput,
-                                           input={"claims": state["claims"]})
+        response = await self.gemma.ainvoke_model(prompt=RANKING_PROMPT,
+                                                  output_schema=RankerOutput,
+                                                  input={"claims": state["claims"]})
         
         if isinstance(response, RankerOutput):
             data = {
                 "claims": response.claims
             }
+        elif isinstance(response, dict) and response.get("error"):
+            data = {"claims": []}
         else:
             response_data = response.model_dump()
             data = {
-                "claims": response_data.get("claims", [])
+                "claims": response_data.get("claims", []),
             }
 
         sorted_claims = sorted(data["claims"], key=lambda x: x.relevance_score, reverse=True)
+
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "...",
+                "message": "Claims have been ranked and sorted by relevance",
+            }
+        )
 
         return {
             "claims": [Claim(text=claim.text, relevance_score=claim.relevance_score) for claim in sorted_claims]
         }
 
-    def run(self, text: str) -> List[Claim]:
+    async def run(self, text: str) -> List[Claim]:
         """
         Runs claims extractor graph.
 
@@ -161,5 +194,5 @@ class Extractor:
             claims=[]
         )
 
-        results = self.graph.invoke(initial_state)
+        results = await self.graph.ainvoke(initial_state)
         return results["claims"]
