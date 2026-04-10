@@ -1,0 +1,6 @@
+langchain_ollama
+pydantic
+fastapi
+langgraph
+python-dotenv
+langdetect
