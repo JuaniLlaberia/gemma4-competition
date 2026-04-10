@@ -1,5 +1,7 @@
+import asyncio
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
+from langchain_core.callbacks import adispatch_custom_event
 from langgraph.checkpoint.memory import MemorySaver
 from typing import TypedDict, Dict, Any, List
 
@@ -9,6 +11,8 @@ from src.workflows.extractor.extractor import Extractor
 class State(TypedDict):
     text: str
     claims: List[Claim]
+
+    has_connection: bool = False
 
 class Orquestrator:
     """
@@ -35,11 +39,13 @@ class Orquestrator:
 
         graph.add_node("extractor", self._extractor_node)
         graph.add_node("manual_ranking", self._manual_ranking_node)
+        graph.add_edge("connection_check", self._check_connection_node)
         graph.add_node("analyzer", self._analyzer_node)
 
         graph.set_entry_point("extractor")
         graph.add_edge("extractor", "manual_ranking")
-        graph.add_edge("manual_ranking", "analyzer")
+        graph.add_edge("manual_ranking", "connection_check")
+        graph.add_edge("connection_check", "analyzer")
         graph.set_finish_point("analyzer")
 
         return graph.compile(checkpointer=self.checkpointer)
@@ -55,7 +61,7 @@ class Orquestrator:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
         extractor = Extractor()
-        results = extractor.run(text=state["text"])
+        results = await extractor.run(text=state["text"])
 
         return {"claims": results["claims"]}
 
@@ -70,7 +76,56 @@ class Orquestrator:
         """
         user_ranking = interrupt({"claims": state["claims"]})
         
-        return {"ranked_claims": user_ranking}
+        return {"claims": user_ranking}
+
+    async def _check_connection_node(self, state: State) -> Dict[str, Any]:
+        """
+        Routes the graph based on user internet connection availability.
+
+        Args:
+            state (State): Graph state.
+        Returns:
+            "has_connection" | "no_connection": Route to take based on internet connection.
+        """
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "...",
+                "message": "Validating your internet connection...",
+            }
+        )
+
+        HOST = "8.8.8.8"
+        PORT = 53
+
+        try:
+            _, writer = await asyncio.wait_for(asyncio.open_connection(HOST, PORT), timeout=3.0)
+            writer.close()
+            await writer.wait_closed()
+
+            await adispatch_custom_event(
+                "progress", 
+                {
+                    "type": "...",
+                    "message": "Internet connection validated. Using Google Fact Check to enhance analysis",
+                    "connection": True
+                }
+            )
+            return {
+                "has_connection": True
+            }
+        except Exception:
+            await adispatch_custom_event(
+                "progress", 
+                {
+                    "type": "...",
+                    "message": "Internet connection failed. Skipping Google Fact Check",
+                    "connection": False
+                }
+            )
+            return {
+                "has_connection": False
+            }
 
     async def _analyzer_node(self, state: State) -> Dict[str, Any]:
         """
