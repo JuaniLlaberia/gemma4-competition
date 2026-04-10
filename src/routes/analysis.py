@@ -25,11 +25,11 @@ async def analyze_article(request: AnalysisRequest):
         async for event in orquestrator.graph.astream_events({"text": request.text}, config=config, version="v2"):
             if event["event"] == "on_custom_event":
                 match event["name"]:
-                    case "":
+                    case "progress":
                         yield f"data: {json.dumps(event['data'])}\n\n"
 
         state = orquestrator.graph.get_state(config)
-        yield f"data: {json.dumps({'interrupt': True, 'thread_id': thread_id, 'claims': state.values['claims']})}\n\n"
+        yield f"data: {json.dumps({'interrupt': True, 'thread_id': thread_id, 'claims': [c.model_dump() for c in state.values['claims']]})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -44,7 +44,7 @@ async def resume_analysis(request: ResumeRequest):
         async for event in orquestrator.graph.astream_events(Command(resume=request.claims), config=config, version="v2"):
             if event["event"] == "on_custom_event":
                 match event["name"]:
-                    case "":
+                    case "progress":
                         yield f"data: {json.dumps(event['data'])}\n\n"
 
         state = orquestrator.graph.get_state(config)
