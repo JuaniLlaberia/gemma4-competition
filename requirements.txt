@@ -4,3 +4,6 @@ fastapi
 langgraph
 python-dotenv
 langdetect
+jinja2
+python-multipart
+uvicorn

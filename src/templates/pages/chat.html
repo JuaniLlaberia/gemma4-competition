@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Chat — Punto Medio{% endblock %}
+
+{% block content %}
+<div id="chat-page" class="flex h-screen overflow-hidden">
+
+  <!-- Left Sidebar -->
+  {% include "components/sidebar.html" %}
+
+  <!-- Main Area -->
+  <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+    <!-- Message Log -->
+    {% include "components/message_log.html" %}
+
+    <!-- Input Area -->
+    {% include "components/input_area.html" %}
+
+  </div>
+</div>
+
+<!-- Server stopped overlay -->
+<div id="server-stopped-overlay"
+  class="hidden fixed inset-0 bg-gray-950/95 flex items-center justify-center z-50">
+  <div class="text-center">
+    <p class="text-2xl font-semibold text-white mb-2">Server stopped.</p>
+    <p class="text-gray-400">You can close this tab.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/app.js"></script>
+{% endblock %}
