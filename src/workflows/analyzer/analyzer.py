@@ -37,9 +37,12 @@ class Analyzer:
         gemma (Ollama): Instance of Ollama using gemma4 models family.
         graph (StateGraph): Workflow's graph.
     """ 
-    def __init__(self):
+    def __init__(self, has_connection: bool = False):
         """
+        Args:
+            has_connection (bool): Boolean determining whether the user has internet connection or not.
         """
+        self.has_connection = has_connection
         self.gfca_client = GFCAClient(api_key=os.getenv("GFCA_API_KEY"))
         self.gemma = Ollama()
         self.graph = self._build_graph()
@@ -245,13 +248,12 @@ class Analyzer:
 
         return {**data}
 
-    async def run(self, claim: Claim, has_connection: bool) -> Dict[str, Any]:
+    async def run(self, claim: Claim) -> Dict[str, Any]:
         """
         Runs claim analyzer workflow.
 
         Args:
             claim (Claim): Claim to analyze.
-            has_connection (bool): Boolean determining whether the user has internet connection or not.
         Returns:
             Dict[str, Any]: A dictionary containing the analysis results with the following keys:
                 - veredict (ClaimVeredict): The verdict of the claim.
@@ -264,7 +266,7 @@ class Analyzer:
         """
         initial_state = State(
             claim=claim,
-            has_connection=has_connection,
+            has_connection=self.has_connection,
             rag_results=[],
             fgca_results=[],
             veredict="uncertain",
