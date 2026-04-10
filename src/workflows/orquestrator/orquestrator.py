@@ -1,18 +1,21 @@
 import asyncio
-from langgraph.graph import StateGraph
+import operator
+from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt
 from langchain_core.callbacks import adispatch_custom_event
 from langgraph.checkpoint.memory import MemorySaver
-from typing import TypedDict, Dict, Any, List
+from typing import TypedDict, Dict, Any, List, Annotated, Literal
 
 from .models.claim import Claim
+from .models.analyzed_claim import AnalyzedClaim
 from src.workflows.extractor.extractor import Extractor
+from src.workflows.analyzer.analyzer import Analyzer
 
 class State(TypedDict):
     text: str
-    claims: List[Claim]
-
+    claims: List[Claim] = []
     has_connection: bool = False
+    analyzed_claims: Annotated[List[AnalyzedClaim], operator.add] = []
 
 class Orquestrator:
     """
@@ -39,14 +42,22 @@ class Orquestrator:
 
         graph.add_node("extractor", self._extractor_node)
         graph.add_node("manual_ranking", self._manual_ranking_node)
-        graph.add_edge("connection_check", self._check_connection_node)
+        graph.add_node("connection_check", self._check_connection_node)
         graph.add_node("analyzer", self._analyzer_node)
 
         graph.set_entry_point("extractor")
         graph.add_edge("extractor", "manual_ranking")
         graph.add_edge("manual_ranking", "connection_check")
         graph.add_edge("connection_check", "analyzer")
-        graph.set_finish_point("analyzer")
+        
+        graph.add_conditional_edges(
+            "analyzer",
+            self._check_remaining_claims_router,
+            {
+                "continue": "analyzer",
+                "end": END
+            }
+        )
 
         return graph.compile(checkpointer=self.checkpointer)
     
@@ -138,3 +149,57 @@ class Orquestrator:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
+        analyzer = Analyzer(has_connection=state["has_connection"])
+        
+        index = len(state.get("analyzed_claims", []))
+        claims = state.get("claims", [])
+        
+        if index >= len(claims):
+            return state
+            
+        claim = claims[index]
+        
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "...",
+                "message": f"Analyzing claim: {claim.text}..."
+            }
+        )
+        
+        analyzer_result = await analyzer.run(claim=claim)
+        
+        analyzed_claim = AnalyzedClaim(
+            text=claim.text,
+            relevance_score=claim.relevance_score,
+            veredict=analyzer_result["veredict"],
+            confidence=analyzer_result["confidence"],
+            reasoning=analyzer_result["reasoning"],
+            analysis=analyzer_result["analysis"],
+            analysis_confidence=analyzer_result["analysis_confidence"],
+            evidence_used=analyzer_result["evidence_used"],
+            limitations=analyzer_result["limitations"]
+        )
+
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "...",
+                "message": f"Analyzed claim: {claim.text}..."
+            }
+        )
+
+        return {"analyzed_claims": [analyzed_claim]}
+
+    async def _check_remaining_claims_router(self, state: State) -> Literal["continue", "end"]:
+        """
+        Routes the graph based on remaining claims to analyze.
+        
+        Args:
+            state (State): Graph state.
+        Returns:
+            "continue" | "end": Route to take.
+        """
+        if len(state.get("analyzed_claims", [])) < len(state.get("claims", [])):
+            return "continue"
+        return "end"
