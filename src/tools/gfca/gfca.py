@@ -1,10 +1,9 @@
 import requests
 import os
+import asyncio
 
 from src.tools.gfca.models.claim import ClaimReview
 from src.tools.gfca.models.result import FactCheckResult
-
-# Note: I (Juan) removed the similarity extra check to not depend on another model (check if we want to include ir or not!)
 
 class GFCAClient:
     """
@@ -27,7 +26,7 @@ class GFCAClient:
                 "No API key provided."
             )
 
-    def _fetch_gfca(
+    async def _fetch_gfca(
         self,
         query: str,
         language_code: str,
@@ -56,7 +55,7 @@ class GFCAClient:
         if publisher_filter:
             params["reviewPublisherSiteFilter"] = publisher_filter
 
-        response = requests.get(self.BASE_URL, params=params)
+        response = await asyncio.to_thread(requests.get, self.BASE_URL, params=params)
         response.raise_for_status()
 
         return response.json()
@@ -75,7 +74,7 @@ class GFCAClient:
             reviews = [
                 ClaimReview(
                     rating_raw=r.get("textualRating", ""),
-                    rating_normalized=self._normalize_rating(r.get("textualRating", "")),
+                    rating_normalized=r.get("textualRating", ""),
                     reviewer_name=r.get("publisher", {}).get("name", ""),
                     reviewer_site=r.get("publisher", {}).get("site", ""),
                     review_url=r.get("url", ""),
@@ -121,7 +120,7 @@ class GFCAClient:
 
         return deduped
     
-    def search(
+    async def search(
         self,
         query: str,
         language_code: str = "en",
@@ -141,7 +140,7 @@ class GFCAClient:
         Returns:
             Filtered, deduplicated list of FactCheckResult.
         """
-        raw_results = self._fetch_gfca(query, language_code, max_age_days, page_size, publisher_filter)
+        raw_results = await self._fetch_gfca(query, language_code, max_age_days, page_size, publisher_filter)
         parsed = self._parse_results(raw=raw_results)
         deduped = self._deduplicate_facts(results=parsed)
 
