@@ -8,14 +8,25 @@ from src.workflows.orquestrator.models.claim import Claim
 from src.tools.gfca.models.result import FactCheckResult
 from src.tools.gfca.gfca import GFCAClient
 from src.utils.helper import detect_language
-from .models.output import VeredictOutput, AnalysisOutput
+from .models.output import AnalysisVerdict, ClaimVeredict, EvidenceItem, VeredictOutput, AnalysisOutput
 from .utils.prompts import CLAIM_VEREDICT_PROMPT, CLAIM_ANALYSIS_PROMPT
 
 class State(TypedDict):
+    # Claim data
     claim: Claim
     fgca_results: List[FactCheckResult]
     rag_results: List[Dict[str, Any]]
     has_connection: bool
+    # Veredict data
+    veredict: ClaimVeredict
+    confidence: float
+    reasoning: str
+    # Analysis data
+    analysis: AnalysisVerdict
+    analysis_confidence: float
+    evidence_used: List[EvidenceItem]
+    limitations: str
+
 
 class Analyzer:
     """
@@ -26,9 +37,12 @@ class Analyzer:
         gemma (Ollama): Instance of Ollama using gemma4 models family.
         graph (StateGraph): Workflow's graph.
     """ 
-    def __init__(self):
+    def __init__(self, has_connection: bool = False):
         """
+        Args:
+            has_connection (bool): Boolean determining whether the user has internet connection or not.
         """
+        self.has_connection = has_connection
         self.gfca_client = GFCAClient(api_key=os.getenv("GFCA_API_KEY"))
         self.gemma = Ollama()
         self.graph = self._build_graph()
@@ -152,30 +166,36 @@ class Analyzer:
 
     async def _claim_veredict_node(self, state: State) -> Dict[str, Any]:
         """
-
+        Handles the pre-evidence analysis.
         
         Args:
             state (State): Graph state.
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the state.
         """
-        response = self.gemma.ainvoke_model(prompt=CLAIM_VEREDICT_PROMPT,
+        response = await self.gemma.ainvoke_model(prompt=CLAIM_VEREDICT_PROMPT,
                                             output_schema=VeredictOutput,
                                             input={"claim": state["claim"]})
         
         if isinstance(response, VeredictOutput):
             data = {
-                "...": ...
+                "veredict": response.veredict,
+                "confidence": response.confidence,
+                "reasoning": response.reasoning
             }
         elif isinstance(response, dict) and response.get("error"):
-            data = {"...": ...}
+            data = {"veredict": "uncertain",
+                    "confidence": 0.0,
+                    "reasoning": "Fail to analyze claim"}
         else:
             response_data = response.model_dump()
             data = {
-                "...": response_data.get("...", ...),
+                "veredict": response_data.get("veredict", "uncertain"),
+                "confidence": response_data.get("confidence", 0.0),
+                "reasoning": response_data.get("reasoning", ""),
             }
 
-        return state
+        return {**data}
 
     async def _analysis_router(self, state: State) -> Literal["has_extra_information", "no_extra_information"]:
         """
@@ -190,14 +210,14 @@ class Analyzer:
 
     async def _claim_analysis_node(self, state: State) -> Dict[str, Any]:
         """
-
+        Handles post-evidence claim analysis based on either GFCA data and/or RAG context.
         
         Args:
             state (State): Graph state.
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the state.
         """
-        response = self.gemma.ainvoke_model(prompt=CLAIM_ANALYSIS_PROMPT,
+        response = await self.gemma.ainvoke_model(prompt=CLAIM_ANALYSIS_PROMPT,
                                             output_schema=AnalysisOutput,
                                             input={"claim": state["claim"],
                                                    "fgca_results": state["fgca_results"],
@@ -205,31 +225,67 @@ class Analyzer:
         
         if isinstance(response, AnalysisOutput):
             data = {
-                "...": ...
+                "analysis": response.analysis,
+                "analysis_confidence": response.confidence,
+                "evidence_used": response.evidence_used,
+                "limitations": response.limitations,
             }
         elif isinstance(response, dict) and response.get("error"):
-            data = {"...": ...}
+            data = {
+                "analysis": "no_evidence",
+                "analysis_confidence": 0.0,
+                "evidence_used": [],
+                "limitations": "Fail to analyze claim",
+            }
         else:
             response_data = response.model_dump()
             data = {
-                "...": response_data.get("...", ...),
+                "analysis": response_data.get("analysis", "no_evidence"),
+                "analysis_confidence": response_data.get("confidence", 0.0),
+                "evidence_used": response_data.get("evidence_used", []),
+                "limitations": response_data.get("limitations", ""),
             }
 
-        return state
+        return {**data}
 
-    async def run(self, claim: Claim, has_connection: bool) -> ...:
+    async def run(self, claim: Claim) -> Dict[str, Any]:
         """
         Runs claim analyzer workflow.
 
         Args:
             claim (Claim): Claim to analyze.
-            has_connection (bool): Boolean determining whether the user has internet connection or not.
         Returns:
-            ...
+            Dict[str, Any]: A dictionary containing the analysis results with the following keys:
+                - veredict (ClaimVeredict): The verdict of the claim.
+                - confidence (float): Confidence score for the verdict.
+                - reasoning (str): Reasoning behind the verdict.
+                - analysis (AnalysisVerdict): Analysis verdict based on evidence.
+                - analysis_confidence (float): Confidence score for the analysis.
+                - evidence_used (List[EvidenceItem]): List of evidence items used.
+                - limitations (str): Any limitations in the analysis.
         """
-        initial_state = State(claim=claim,
-                              has_connection=has_connection,
-                              rag_results=[],
-                              fgca_results=[])
+        initial_state = State(
+            claim=claim,
+            has_connection=self.has_connection,
+            rag_results=[],
+            fgca_results=[],
+            veredict="uncertain",
+            confidence=0.0,
+            reasoning="",
+            analysis="no_evidence",
+            analysis_confidence=0.0,
+            evidence_used=[],
+            limitations="",
+        )
         
         results = await self.graph.ainvoke(initial_state)
+
+        return {
+            "veredict": results["veredict"],
+            "confidence": results["confidence"],
+            "reasoning": results["reasoning"],
+            "analysis": results["analysis"],
+            "analysis_confidence": results["analysis_confidence"],
+            "evidence_used": results["evidence_used"],
+            "limitations": results["limitations"],  
+        }
