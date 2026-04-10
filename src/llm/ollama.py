@@ -75,3 +75,29 @@ class Ollama:
                 "error": True,
                 "error_message": str(e)
             }
+
+    async def ainvoke_model(self,
+                            prompt: any,
+                            output_schema: BaseModel,
+                            input: dict[str, any]) -> any:
+        """
+        Async invoke the configured model chain with structured output.
+
+        Args:
+            prompt: A prompt object or prompt string.
+            output_schema: A Pydantic `BaseModel` class describing the structured output schema.
+            input: A dictionary of inputs to pass to the chain.
+        Returns:
+            The raw result returned by the chain.
+        """
+        structured_llm = self.llm.with_structured_output(output_schema)
+        chain = prompt | structured_llm
+
+        try:
+            result = await chain.ainvoke(input)
+            return result
+        except Exception as e:
+            return {
+                "error": True,
+                "error_message": str(e)
+            }
