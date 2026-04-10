@@ -9,5 +9,5 @@ class ClaimLabel(Enum):
 class Claim(BaseModel):
     text: str = Field(..., description="Extracted verifiable sentence")
     relevance_score: float | None = Field(..., ge=0, le=1, description="Score from 0 to 1 based con how relevant is this claim")
-    label: ClaimLabel | None = Field(..., description="Type of claim after analysis")
-    analysis: str | None = Field(..., description="Claim analysis based on retrieve information from GFCA or RAG")
+    label: ClaimLabel | None = Field(None, description="Type of claim after analysis")
+    analysis: str | None = Field(None, description="Claim analysis based on retrieve information from GFCA or RAG")
