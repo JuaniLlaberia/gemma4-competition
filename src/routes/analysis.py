@@ -1,4 +1,4 @@
-import json, uuid
+import json, uuid, asyncio
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 from langgraph.types import Command
@@ -6,6 +6,7 @@ from langgraph.types import Command
 from .models.request import AnalysisRequest, ResumeRequest
 from src.workflows.orquestrator.orquestrator import Orquestrator
 from src.llm.ollama import Ollama
+from src.tools.vector_db.db import vector_store_manager
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
 orquestrator = Orquestrator()
@@ -44,7 +45,18 @@ async def analyze_article(request: AnalysisRequest):
     config = {"configurable": {"thread_id": thread_id}}
 
     async def stream():
-        async for event in orquestrator.graph.astream_events({"text": analysis_text, "role": request.role}, config=config, version="v2"):
+        use_rag = False
+        if request.docs:
+            vector_store_manager.initialize()
+            vector_store_manager.clear()
+            
+            yield f"data: {json.dumps({'type': 'INFO', 'message': 'Extracting and processing provided documents...'})}\n\n"
+            await asyncio.to_thread(vector_store_manager.process_and_add_documents, request.docs)
+            
+            use_rag = True
+            yield f"data: {json.dumps({'type': 'SUCCESS', 'message': 'Documents processed successfully'})}\n\n"
+
+        async for event in orquestrator.graph.astream_events({"text": analysis_text, "role": request.role, "use_rag": use_rag}, config=config, version="v2"):
             if event["event"] == "on_custom_event":
                 match event["name"]:
                     case "progress":
@@ -63,15 +75,20 @@ async def resume_analysis(request: ResumeRequest):
     config = {"configurable": {"thread_id": request.thread_id}}
 
     async def stream():
-        async for event in orquestrator.graph.astream_events(Command(resume=request.claims), config=config, version="v2"):
-            if event["event"] == "on_custom_event":
-                match event["name"]:
-                    case "progress":
-                        yield f"data: {json.dumps(event['data'])}\n\n"
-                    case "claim_result":
-                        yield f"data: {json.dumps({'claim_result': event['data']})}\n\n"
+        try:
+            async for event in orquestrator.graph.astream_events(Command(resume=request.claims), config=config, version="v2"):
+                if event["event"] == "on_custom_event":
+                    match event["name"]:
+                        case "progress":
+                            yield f"data: {json.dumps(event['data'])}\n\n"
+                        case "claim_result":
+                            yield f"data: {json.dumps({'claim_result': event['data']})}\n\n"
 
-        state = orquestrator.graph.get_state(config)
-        yield f"data: {json.dumps({'done': True})}\n\n"
+            state = orquestrator.graph.get_state(config)
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        finally:
+            # Clear singleton DB after full flow finishes to prevent cross-session conflicts
+            if vector_store_manager._ready:
+                vector_store_manager.clear()
 
     return StreamingResponse(stream(), media_type="text/event-stream")

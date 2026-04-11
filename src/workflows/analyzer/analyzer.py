@@ -8,6 +8,7 @@ from src.workflows.orquestrator.models.claim import Claim
 from src.tools.gfca.models.result import FactCheckResult
 from src.tools.gfca.gfca import GFCAClient
 from src.utils.helper import detect_language
+from src.tools.vector_db.db import vector_store_manager
 from .models.output import AnalysisVerdict, ClaimVeredict, EvidenceItem, VeredictOutput, AnalysisOutput
 from .utils.prompts import CLAIM_VEREDICT_PROMPT, CLAIM_ANALYSIS_PROMPT
 
@@ -18,6 +19,7 @@ class State(TypedDict):
     fgca_results: List[FactCheckResult]
     rag_results: List[Dict[str, Any]]
     has_connection: bool
+    use_rag: bool
     # Veredict data
     veredict: ClaimVeredict
     confidence: float
@@ -36,18 +38,21 @@ class Analyzer:
     Attributes:
         role (str): User role in current session.
         has_connection (bool): Whether the user has internet connection or not.
+        use_rag (bool): Whether to retrieve documents from vector DB.
         fgca_client (GFCAClient): Instance of FGCA to call the api for fact checking results.
         gemma (Ollama): Instance of Ollama using gemma4 models family.
         graph (StateGraph): Workflow's graph.
     """ 
-    def __init__(self, role: str, has_connection: bool = False):
+    def __init__(self, role: str, has_connection: bool = False, use_rag: bool = False):
         """
         Args:
-            has_connection (bool): Boolean determining whether the user has internet connection or not.
             role (str): User role in current session.
+            has_connection (bool): Boolean determining whether the user has internet connection or not.
+            use_rag (bool): Boolean determining whether RAG documents are available to query.
         """
         self.role = role
         self.has_connection = has_connection
+        self.use_rag = use_rag
         self.gfca_client = GFCAClient(api_key=os.getenv("GFCA_API_KEY")) if has_connection else None
         self.gemma = Ollama()
         self.graph = self._build_graph()
@@ -161,7 +166,6 @@ class Analyzer:
                 "fgca_results": [],
             }
 
-    # TODO: Define rag context.
     async def _rag_router(self, state: State) -> Literal["has_context", "no_context"]:
         """
         Routes graph based on RAG context present in system.
@@ -171,9 +175,8 @@ class Analyzer:
         Returns:
             "has_context" | "no_context": Route to take based on RAG context availability.
         """
-        return "has_context" if True else "no_context"
+        return "has_context" if state.get("use_rag") else "no_context"
 
-    # TODO: Implement RAG retrieval and ranking.
     async def _rag_node(self, state: State) -> Dict[str, Any]:
         """
         Performs claim evidence search using RAG to retrieve context for LLM.
@@ -183,7 +186,39 @@ class Analyzer:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the state.
         """
-        return state
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "INFO",
+                "claim": state["claim"].text,
+                "message": "Retrieving evidence from documents...",
+            }
+        )
+
+        try:
+            results = vector_store_manager.similarity_search(state["claim"].text, k=5)
+            rag_results = [{"content": doc.page_content, "metadata": doc.metadata} for doc in results]
+            
+            await adispatch_custom_event(
+                "progress", 
+                {
+                    "type": "SUCCESS",
+                    "claim": state["claim"].text,
+                    "message": "Found context in documents",
+                }
+            )
+            return {"rag_results": rag_results}
+        except Exception as e:
+            await adispatch_custom_event(
+                "progress", 
+                {
+                    "type": "ERROR",
+                    "claim": state["claim"].text,
+                    "message": "Failed to retrieve context from documents",
+                    "error": str(e)
+                }
+            )
+            return {"rag_results": []}
 
     async def _claim_veredict_node(self, state: State) -> Dict[str, Any]:
         """
@@ -327,6 +362,7 @@ class Analyzer:
             claim=claim,
             role=self.role,
             has_connection=self.has_connection,
+            use_rag=self.use_rag,
             rag_results=[],
             fgca_results=[],
             veredict="uncertain",
