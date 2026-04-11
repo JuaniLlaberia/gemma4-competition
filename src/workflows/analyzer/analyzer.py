@@ -48,7 +48,7 @@ class Analyzer:
         """
         self.role = role
         self.has_connection = has_connection
-        self.gfca_client = GFCAClient(api_key=os.getenv("GFCA_API_KEY"))
+        self.gfca_client = GFCAClient(api_key=os.getenv("GFCA_API_KEY")) if has_connection else None
         self.gemma = Ollama()
         self.graph = self._build_graph()
 
