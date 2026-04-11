@@ -3,29 +3,144 @@
 {% block title %}Chat — Punto Medio{% endblock %}
 
 {% block content %}
-<div id="chat-page" class="flex h-screen overflow-hidden">
+<div id="chat-page" class="flex flex-col h-screen overflow-hidden">
 
-  <!-- Left Sidebar -->
-  {% include "components/sidebar.html" %}
+  <!-- Top bar: exit button -->
+  <div class="flex items-center px-4 py-3 shrink-0">
+    <button id="exit-btn" title="Exit app"
+      class="flex items-center gap-1.5 text-gray-600 hover:text-gray-300 transition-colors cursor-pointer px-2 py-1.5 rounded-lg hover:bg-[#1a1a1a] active:scale-95">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+      <span class="text-xs font-medium">Exit</span>
+    </button>
+  </div>
 
-  <!-- Main Area -->
-  <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+  <!-- Main area -->
+  <div id="main-area" class="flex-1 flex flex-col overflow-hidden">
 
-    <!-- Message Log -->
-    {% include "components/message_log.html" %}
+    <!-- Spacer: pushes input-section to center in welcome state -->
+    <div id="top-spacer" class="flex-1"></div>
 
-    <!-- Input Area -->
-    {% include "components/input_area.html" %}
+    <!-- Chat screen: message log (hidden initially; becomes flex-1 after first send) -->
+    <div id="chat-screen" class="hidden flex-1 overflow-hidden">
+      {% include "components/message_log.html" %}
+    </div>
 
+    <!-- Input section: welcome text + input (always at the bottom) -->
+    <div id="input-section">
+      <!-- Welcome text (hidden after first send) -->
+      <div id="welcome-text" class="px-6 pb-4">
+        <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">What can I help you with?</h1>
+        <p class="text-sm text-gray-500">Paste an article or text to fact-check</p>
+      </div>
+      {% include "components/input_area.html" %}
+    </div>
+
+  </div>
+</div>
+
+<!-- Exit Confirmation Modal -->
+<div id="exit-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+  <div class="bg-[#111] rounded-2xl p-6 w-full max-w-sm border border-[#222] shadow-2xl">
+    <h2 class="text-base font-semibold text-white mb-2">Exit Punto Medio?</h2>
+    <p class="text-sm text-gray-500 mb-5">This will shut down the server. Any ongoing analysis will be lost.</p>
+    <div class="flex gap-3">
+      <button id="exit-confirm-btn"
+        class="flex-1 px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 active:scale-95 transition-all cursor-pointer">
+        Exit
+      </button>
+      <button id="exit-cancel-btn"
+        class="px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-gray-200 hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
+        Cancel
+      </button>
+    </div>
   </div>
 </div>
 
 <!-- Server stopped overlay -->
 <div id="server-stopped-overlay"
-  class="hidden fixed inset-0 bg-gray-950/95 flex items-center justify-center z-50">
+  class="hidden fixed inset-0 bg-[#0d0d0d]/95 flex items-center justify-center z-50">
   <div class="text-center">
     <p class="text-2xl font-semibold text-white mb-2">Server stopped.</p>
-    <p class="text-gray-400">You can close this tab.</p>
+    <p class="text-gray-500">You can close this tab.</p>
+  </div>
+</div>
+
+<!-- API Key Modal -->
+<div id="api-key-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+  <div class="bg-[#111] rounded-2xl p-6 w-full max-w-sm border border-[#222] shadow-2xl">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-base font-semibold text-white">Google Fact Check API Key</h2>
+      <button id="api-key-modal-close" class="text-gray-600 hover:text-gray-300 transition-colors cursor-pointer p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="modal-api-key-form" class="flex flex-col gap-3">
+      <input id="modal-api-key-input" type="password" placeholder="Enter your API key…"
+        class="w-full bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#3a3a3a]" />
+      <label class="flex items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
+        <input id="modal-api-key-remember" type="checkbox" class="accent-gray-400" />
+        Save to disk
+      </label>
+      <button id="modal-api-key-save"
+        class="w-full px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 active:scale-95 transition-all cursor-pointer">
+        Save Key
+      </button>
+    </div>
+    <div id="modal-api-key-display" class="hidden flex-col gap-3">
+      <div class="bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5">
+        <p id="modal-api-key-masked" class="text-sm font-mono text-gray-400"></p>
+        <p id="modal-api-key-note" class="text-xs text-gray-600 mt-1"></p>
+      </div>
+      <button id="modal-api-key-clear"
+        class="w-full px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-white hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
+        Remove Key
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Role Modal -->
+<div id="role-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+  <div class="bg-[#111] rounded-2xl p-6 w-full max-w-lg border border-[#222] shadow-2xl flex flex-col max-h-[80vh]">
+    <div class="flex items-center justify-between mb-5 shrink-0">
+      <h2 class="text-base font-semibold text-white">Select Role</h2>
+      <button id="role-modal-close" class="text-gray-600 hover:text-gray-300 transition-colors cursor-pointer p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="modal-role-grid" class="flex flex-col gap-2 overflow-y-auto flex-1 min-h-0 mb-4 pr-1"></div>
+    <div id="modal-role-empty" class="hidden text-center text-gray-600 py-3 text-sm shrink-0">
+      No roles saved yet.
+    </div>
+    <div class="shrink-0">
+      <button id="modal-role-show-create"
+        class="w-full px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-gray-200 hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
+        + New Role
+      </button>
+      <div id="modal-role-create-form" class="hidden flex flex-col gap-3 mt-3">
+        <input id="modal-new-role-name" type="text" placeholder="Role name…"
+          class="w-full bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#3a3a3a]" />
+        <textarea id="modal-new-role-content" rows="3" placeholder="Instructions / perspective…"
+          class="w-full bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#3a3a3a] resize-none"></textarea>
+        <div class="flex gap-3">
+          <button id="modal-new-role-save"
+            class="flex-1 px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 active:scale-95 transition-all cursor-pointer">
+            Save &amp; Select
+          </button>
+          <button id="modal-new-role-cancel"
+            class="px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-gray-200 hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
+            Cancel
+          </button>
+        </div>
+        <p id="modal-new-role-error" class="hidden text-red-400 text-xs"></p>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}
