@@ -2,16 +2,6 @@
 /// <reference path="./types.d.ts" />
 
 /**
- * @param {number} score
- * @returns {string}
- */
-function scoreColor(score) {
-  if (score >= 0.7) return "bg-green-700 text-green-100";
-  if (score >= 0.4) return "bg-yellow-700 text-yellow-100";
-  return "bg-red-800 text-red-100";
-}
-
-/**
  * Initializes the claims editor inside `container`.
  * @param {HTMLElement} container
  * @param {import('./types').Claim[]} initialClaims
@@ -28,21 +18,30 @@ export function initClaimsEditor(container, initialClaims, onContinue, onRestart
   let undoTimer = null;
 
   const html = `
-    <h3 class="text-base font-semibold text-white mb-1">Review Extracted Claims</h3>
-    <p class="text-sm text-gray-400 mb-4">Reorder, edit, or remove claims before continuing analysis.</p>
-    <div class="claims-list flex flex-col gap-2 mb-4"></div>
-    <div class="flex items-center gap-3 mt-4">
-      <button class="continue-btn px-4 py-2 rounded-lg bg-green-700 hover:bg-green-600 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center shrink-0 text-gray-500">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-widest font-semibold text-gray-600">RERANK</p>
+        <p class="text-xs text-gray-500 mt-0.5">Reorder or remove claims before analysis</p>
+      </div>
+    </div>
+    <div class="claims-list flex flex-col gap-2 mb-5"></div>
+    <div class="flex items-center gap-3">
+      <button class="continue-btn px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
         Continue Analysis
       </button>
-      <button class="restart-btn px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-medium transition-colors">
+      <button class="restart-btn px-4 py-2 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-gray-200 text-sm font-medium transition-colors">
         Restart
       </button>
-      <span class="claims-count text-xs text-gray-500 ml-auto"></span>
+      <span class="claims-count text-xs text-gray-600 ml-auto"></span>
     </div>
-    <div class="undo-toast hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-sm px-4 py-2 rounded-full shadow-lg flex items-center gap-3 z-50">
-      <span>Claim removed.</span>
-      <button class="undo-btn text-blue-300 hover:text-blue-200 font-medium">Undo</button>
+    <div class="undo-toast hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#2a2a2a] text-white text-sm px-4 py-2 rounded-full shadow-xl flex items-center gap-3 z-50">
+      <span class="text-gray-300">Claim removed.</span>
+      <button class="undo-btn text-gray-200 hover:text-white font-medium">Undo</button>
     </div>
   `;
   container.innerHTML = html;
@@ -56,7 +55,11 @@ export function initClaimsEditor(container, initialClaims, onContinue, onRestart
 
   restartBtn.addEventListener("click", onRestart);
   continueBtn.addEventListener("click", () => {
-    if (claims.length > 0) onContinue(claims);
+    if (claims.length > 0) {
+      container.style.opacity = "0.4";
+      container.style.pointerEvents = "none";
+      onContinue(claims);
+    }
   });
   undoBtn.addEventListener("click", () => {
     if (undoPending) {
@@ -79,25 +82,20 @@ export function initClaimsEditor(container, initialClaims, onContinue, onRestart
     claims.forEach((claim, i) => {
       const card = document.createElement("div");
       card.className =
-        "flex items-start gap-2 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 cursor-grab active:cursor-grabbing";
+        "flex items-center gap-3 bg-[#151515] border border-[#222] rounded-xl px-4 py-3 cursor-grab active:cursor-grabbing";
       card.draggable = true;
       card.dataset.index = String(i);
 
-      const score = claim.relevance_score ?? 0;
-      const scoreCls = scoreColor(score);
-
       card.innerHTML = `
-        <div class="drag-handle mt-1 text-gray-500 cursor-grab shrink-0">⠿</div>
-        <div class="flex-1 min-w-0">
-          <p class="claim-text text-sm text-gray-100 cursor-text" contenteditable="false">${claim.text}</p>
-        </div>
-        <div class="flex items-center gap-1.5 shrink-0 mt-0.5">
-          <span class="text-xs font-mono px-1.5 py-0.5 rounded ${scoreCls}">${score.toFixed(2)}</span>
+        <span class="text-gray-600 text-xs w-4 shrink-0 text-right select-none">${i + 1}</span>
+        <span class="drag-handle text-gray-700 cursor-grab shrink-0 select-none text-base leading-none">⠿</span>
+        <p class="claim-text flex-1 text-sm text-gray-200 min-w-0 outline-none cursor-text" contenteditable="false">${claim.text}</p>
+        <div class="flex items-center gap-2 shrink-0">
           <div class="flex flex-col gap-0.5">
-            <button class="move-up-btn text-gray-500 hover:text-white text-xs leading-none" title="Move up">▲</button>
-            <button class="move-down-btn text-gray-500 hover:text-white text-xs leading-none" title="Move down">▼</button>
+            <button class="move-up-btn text-gray-700 hover:text-gray-300 text-xs leading-none transition-colors" title="Move up">▲</button>
+            <button class="move-down-btn text-gray-700 hover:text-gray-300 text-xs leading-none transition-colors" title="Move down">▼</button>
           </div>
-          <button class="delete-btn text-gray-600 hover:text-red-400 transition-colors text-sm" title="Delete">✕</button>
+          <button class="delete-btn text-gray-700 hover:text-red-400 transition-colors text-sm ml-1" title="Delete">✕</button>
         </div>
       `;
 

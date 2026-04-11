@@ -41,7 +41,7 @@ function renderRoles(roles) {
   roles.forEach((role) => {
     const card = document.createElement("div");
     card.className =
-      "relative group bg-gray-800 border border-gray-700 rounded-xl p-4 cursor-pointer hover:border-blue-500 transition-colors";
+      "relative group bg-[#111] border border-[#1e1e1e] rounded-2xl p-4 cursor-pointer hover:border-[#333] active:scale-[0.98] transition-all";
     card.innerHTML = `
       <h3 class="font-semibold text-white mb-1 truncate">${role.name}</h3>
       <p class="text-xs text-gray-400 line-clamp-3">${role.preview}</p>

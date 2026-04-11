@@ -60,6 +60,17 @@ async def create_role(body: RoleCreate):
     path.write_text(body.content, encoding="utf-8")
     return {"name": name}
 
+@router.get("/roles/{name}")
+async def get_role(name: str):
+    """
+    Endpoint to get a single role by name (full content).
+    """
+    path = _save_dir() / f"{name}.txt"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Role not found")
+    content = path.read_text(encoding="utf-8")
+    return {"name": name, "content": content}
+
 @router.delete("/roles/{name}", status_code=204)
 async def delete_role(name: str):
     """
