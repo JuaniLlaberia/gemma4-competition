@@ -5,39 +5,39 @@ from pathlib import Path
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+
+from src.routes.models.role import RoleCreate
+from src.routes.frontend import ConfigUpdate
 
 BASE_DIR = Path(__file__).parent.parent.parent
 templates = Jinja2Templates(directory=BASE_DIR / "src" / "templates")
 
 router = APIRouter(tags=["frontend"])
 
-
 def _save_dir() -> Path:
     return Path(os.environ["SAVE_FILE_DIRECTORY"])
 
-
-# ── Page routes ────────────────────────────────────────────────────────────────
-
+# Page routes
 @router.get("/", response_class=HTMLResponse)
 async def role_select(request: Request):
+    """
+    Endpoint to generate the role selection page.
+    """
     return templates.TemplateResponse(request, "pages/role_select.html")
-
 
 @router.get("/chat", response_class=HTMLResponse)
 async def chat(request: Request):
+    """
+    Endpoint to generate the analysis chat page.
+    """
     return templates.TemplateResponse(request, "pages/chat.html")
 
-
-# ── Roles CRUD ─────────────────────────────────────────────────────────────────
-
-class RoleCreate(BaseModel):
-    name: str
-    content: str
-
-
+# Role routes
 @router.get("/roles")
 async def list_roles():
+    """
+    Endpoint to list all available roles.
+    """
     save_dir = _save_dir()
     roles = []
     for f in sorted(save_dir.glob("*.txt")):
@@ -48,9 +48,11 @@ async def list_roles():
         roles.append({"name": f.stem, "preview": preview})
     return roles
 
-
 @router.post("/roles", status_code=201)
 async def create_role(body: RoleCreate):
+    """
+    Endpoint to create a new role.
+    """
     name = body.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Role name cannot be empty")
@@ -58,22 +60,27 @@ async def create_role(body: RoleCreate):
     path.write_text(body.content, encoding="utf-8")
     return {"name": name}
 
-
 @router.delete("/roles/{name}", status_code=204)
 async def delete_role(name: str):
+    """
+    Endpoint to delete a role.
+    """
     path = _save_dir() / f"{name}.txt"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Role not found")
     path.unlink()
 
-
-# ── Config CRUD ────────────────────────────────────────────────────────────────
-
+# Configuration routes
 def _config_path() -> Path:
+    """
+    Returns the path to the configuration file.
+    """
     return _save_dir() / "config.json"
 
-
 def _read_config() -> dict:
+    """
+    Reads the configuration file.
+    """
     p = _config_path()
     if not p.exists():
         return {}
@@ -82,33 +89,36 @@ def _read_config() -> dict:
     except json.JSONDecodeError:
         return {}
 
-
-class ConfigUpdate(BaseModel):
-    gfca_api_key: str
-
-
 @router.get("/config")
 async def get_config():
+    """
+    Endpoint to get the current configuration.
+    """
     cfg = _read_config()
     return {"gfca_api_key": cfg.get("gfca_api_key")}
 
-
 @router.post("/config", status_code=204)
 async def save_config(body: ConfigUpdate):
+    """
+    Endpoint to save the current configuration.
+    """
     cfg = _read_config()
     cfg["gfca_api_key"] = body.gfca_api_key
     _config_path().write_text(json.dumps(cfg), encoding="utf-8")
 
-
 @router.delete("/config/gfca-key", status_code=204)
 async def delete_gfca_key():
+    """
+    Endpoint to delete the GFCA API key.
+    """
     cfg = _read_config()
     cfg.pop("gfca_api_key", None)
     _config_path().write_text(json.dumps(cfg), encoding="utf-8")
 
-
-# ── Shutdown ───────────────────────────────────────────────────────────────────
-
+# Shutdown route
 @router.post("/shutdown", status_code=204)
 async def shutdown():
+    """
+    Endpoint to shutdown the server.
+    """
     os.kill(os.getpid(), signal.SIGKILL)

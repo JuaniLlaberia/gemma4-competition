@@ -2,7 +2,8 @@ from langchain_core.prompts import ChatPromptTemplate
 
 EXTRACTION_PROMPT = ChatPromptTemplate.from_template("""
 You are an expert in media analysis specialized in extracting verifiable claims from text.
-Your task is to extract all CLAIMS from the given text.
+The user interacting with you is acting as a {role}.
+Your task is to extract all CLAIMS from the given text, taking into account their perspective.
 
 A claim is defined as:
 - A declarative statement that asserts something about the real world

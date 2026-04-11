@@ -9,6 +9,7 @@ from src.llm.ollama import Ollama
 
 class State(TypedDict):
     text: str
+    role: str
     raw_claims: List[str]
     claims: List[Claim]
 
@@ -17,13 +18,18 @@ class Extractor:
     Workflow for claims extraction.
 
     Attributes:
+        role (str): User role in current session.
         gemma (Ollama): Instance of Ollama using gemma4 models family.
         graph (StateGraph): Workflow's graph.
     """ 
-    def __init__(self):
+    def __init__(self, role: str):
         """
         Initialices Extractor workflow class.
+
+        Args:
+            role (str): User role in current session.
         """
+        self.role = role
         self.gemma = Ollama()
         self.graph = self._build_graph()
 
@@ -66,7 +72,8 @@ class Extractor:
         """
         response = await self.gemma.ainvoke_model(prompt=EXTRACTION_PROMPT,
                                                   output_schema=ExtractorOutput,
-                                                  input={"text": state["text"]})
+                                                  input={"text": state["text"],
+                                                         "role": state["role"]})
         
         if isinstance(response, ExtractorOutput):
             data = {
@@ -83,7 +90,7 @@ class Extractor:
         await adispatch_custom_event(
             "progress", 
             {
-                "type": "...",
+                "type": "SUCCESS",
                 "message": f"{len(data['claims'])} claims have been extracted",
                 "claims_amount": len(data["claims"])
             }
@@ -111,6 +118,14 @@ class Extractor:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "INFO",
+                "message": "Normalizing claims...",
+            }
+        )
+
         response = await self.gemma.ainvoke_model(prompt=NORMALIZATION_PROMPT,
                                                   output_schema=NormalizatorOutput,
                                                   input={"raw_claims": state["raw_claims"]})
@@ -130,7 +145,7 @@ class Extractor:
         await adispatch_custom_event(
             "progress", 
             {
-                "type": "...",
+                "type": "SUCCESS",
                 "message": f"{len(data['claims'])} claims after normalization",
                 "claims_amount": len(data["claims"])
             }
@@ -149,6 +164,14 @@ class Extractor:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "INFO",
+                "message": "Ranking claims by relevance...",
+            }
+        )
+
         response = await self.gemma.ainvoke_model(prompt=RANKING_PROMPT,
                                                   output_schema=RankerOutput,
                                                   input={"claims": state["claims"]})
@@ -170,8 +193,8 @@ class Extractor:
         await adispatch_custom_event(
             "progress", 
             {
-                "type": "...",
-                "message": "Claims have been ranked and sorted by relevance",
+                "type": "SUCCESS",
+                "message": "Claims have been ranked and sorted",
             }
         )
 
@@ -190,6 +213,7 @@ class Extractor:
         """
         initial_state = State(
             text=text,
+            role=self.role,
             raw_claims=[],
             claims=[]
         )

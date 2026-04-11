@@ -13,6 +13,7 @@ from src.workflows.analyzer.analyzer import Analyzer
 
 class State(TypedDict):
     text: str
+    role: str
     claims: List[Claim] = []
     has_connection: bool = False
     analyzed_claims: Annotated[List[AnalyzedClaim], operator.add] = []
@@ -71,7 +72,15 @@ class Orquestrator:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        extractor = Extractor()
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "INFO",
+                "message": "Extracting claims from provided text...",
+            }
+        )
+
+        extractor = Extractor(role=state["role"])
         results = await extractor.run(text=state["text"])
 
         return {"claims": results["claims"]}
@@ -101,7 +110,7 @@ class Orquestrator:
         await adispatch_custom_event(
             "progress", 
             {
-                "type": "...",
+                "type": "INFO",
                 "message": "Validating your internet connection...",
             }
         )
@@ -117,7 +126,7 @@ class Orquestrator:
             await adispatch_custom_event(
                 "progress", 
                 {
-                    "type": "...",
+                    "type": "SUCCESS",
                     "message": "Internet connection validated. Using Google Fact Check to enhance analysis",
                     "connection": True
                 }
@@ -129,7 +138,7 @@ class Orquestrator:
             await adispatch_custom_event(
                 "progress", 
                 {
-                    "type": "...",
+                    "type": "INFO",
                     "message": "Internet connection failed. Skipping Google Fact Check",
                     "connection": False
                 }
@@ -149,7 +158,7 @@ class Orquestrator:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        analyzer = Analyzer(has_connection=state["has_connection"])
+        analyzer = Analyzer(has_connection=state["has_connection"], role=state["role"])
         
         index = len(state.get("analyzed_claims", []))
         claims = state.get("claims", [])
@@ -162,8 +171,8 @@ class Orquestrator:
         await adispatch_custom_event(
             "progress", 
             {
-                "type": "...",
-                "message": f"Analyzing claim: {claim.text}..."
+                "type": "INFO",
+                "message": f"Initializing claim analysis: {claim.text}..."
             }
         )
         
@@ -182,10 +191,11 @@ class Orquestrator:
         )
 
         await adispatch_custom_event(
-            "progress", 
+            "claim_result", 
             {
-                "type": "...",
-                "message": f"Analyzed claim: {claim.text}..."
+                "type": "SUCCESS",
+                "claim": analyzed_claim.model_dump(),
+                "message": f"Completed claim analysis"
             }
         )
 

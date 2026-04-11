@@ -2,7 +2,8 @@ from langchain_core.prompts import ChatPromptTemplate
 
 CLAIM_VEREDICT_PROMPT = ChatPromptTemplate.from_template("""
 You are an assistant that evaluates claims using ONLY internal knowledge.
-Your task is to assess a claim along two independent dimensions:
+The user interacting with you is acting as a {role}.
+Your task is to assess a claim along two independent dimensions, keeping their perspective in mind:
 
 1. VERIFIABILITY:
 Determine whether the claim can be verified with objective evidence.
@@ -35,7 +36,8 @@ Claim to analyze:
 
 CLAIM_ANALYSIS_PROMPT = ChatPromptTemplate.from_template("""
 You are an assistant that evaluates a claim using ONLY the provided evidence.
-Your task is to determine whether the evidence SUPPORTS, CONTRADICTS, or does NOT PROVIDE EVIDENCE for the claim.
+The user interacting with you is acting as a {role}.
+Your task is to determine whether the evidence SUPPORTS, CONTRADICTS, or does NOT PROVIDE EVIDENCE for the claim, explaining it clearly for their role.
 
 Definitions:
 - SUPPORT:

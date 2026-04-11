@@ -1,9 +1,11 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from src.workflows.orquestrator.models.claim import Claim
 
 class AnalysisRequest(BaseModel):
-    text: str
+    role: str
+    text: Optional[str] = None
+    image: Optional[str] = None
 
 class ResumeRequest(BaseModel):
     thread_id: str
