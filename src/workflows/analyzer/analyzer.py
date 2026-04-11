@@ -123,27 +123,43 @@ class Analyzer:
         await adispatch_custom_event(
             "progress", 
             {
-                "type": "...",
+                "type": "INFO",
+                "claim": state["claim"].text,
                 "message": "Retrieving evidence from Google Fact Check...",
             }
         )
 
-        results = await self.gfca_client.search(
-            query=state["claim"].text,
-            language_code=language
-        )
+        try:
+            results = await self.gfca_client.search(
+                query=state["claim"].text,
+                language_code=language
+            )
 
-        await adispatch_custom_event(
-            "progress", 
-            {
-                "type": "...",
-                "message": f"{len(results)} results found",
-                "results_amount": len(results)
+            await adispatch_custom_event(
+                "progress", 
+                {
+                    "type": "SUCCESS",
+                    "claim": state["claim"].text,
+                    "message": f"{len(results)} results found",
+                    "results_amount": len(results)
+                }
+            )
+            return {
+                "fgca_results": results,
             }
-        )
-        return {
-            "fgca_results": results,
-        }
+        except Exception as e:
+            await adispatch_custom_event(
+                "progress", 
+                {
+                    "type": "ERROR",
+                    "claim": state["claim"].text,
+                    "message": "Failed to retrieve evidence from Google Fact Check",
+                    "error": e
+                }
+            )
+            return {
+                "fgca_results": [],
+            }
 
     # TODO: Define rag context.
     async def _rag_router(self, state: State) -> Literal["has_context", "no_context"]:
@@ -178,6 +194,15 @@ class Analyzer:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the state.
         """
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "INFO",
+                "claim": state["claim"].text,
+                "message": "Running preliminary analysis..."
+            }
+        )
+
         response = await self.gemma.ainvoke_model(prompt=CLAIM_VEREDICT_PROMPT,
                                             output_schema=VeredictOutput,
                                             input={"claim": state["claim"],
@@ -201,6 +226,15 @@ class Analyzer:
                 "reasoning": response_data.get("reasoning", ""),
             }
 
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "SUCCESS",
+                "claim": state["claim"].text,
+                "message": "Preliminary analysis completed"
+            }
+        )
+
         return {**data}
 
     async def _analysis_router(self, state: State) -> Literal["has_extra_information", "no_extra_information"]:
@@ -223,6 +257,15 @@ class Analyzer:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the state.
         """
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "INFO",
+                "claim": state["claim"].text,
+                "message": "Running evidence-based analysis..."
+            }
+        )
+
         response = await self.gemma.ainvoke_model(prompt=CLAIM_ANALYSIS_PROMPT,
                                             output_schema=AnalysisOutput,
                                             input={"claim": state["claim"],
@@ -252,6 +295,15 @@ class Analyzer:
                 "evidence_used": response_data.get("evidence_used", []),
                 "limitations": response_data.get("limitations", ""),
             }
+
+        await adispatch_custom_event(
+            "progress", 
+            {
+                "type": "SUCCESS",
+                "claim": state["claim"].text,
+                "message": "Evidence-based analysis completed"
+            }
+        )
 
         return {**data}
 

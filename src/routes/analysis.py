@@ -68,6 +68,8 @@ async def resume_analysis(request: ResumeRequest):
                 match event["name"]:
                     case "progress":
                         yield f"data: {json.dumps(event['data'])}\n\n"
+                    case "claim_result":
+                        yield f"data: {json.dumps({'claim_result': event['data']})}\n\n"
 
         state = orquestrator.graph.get_state(config)
         yield f"data: {json.dumps({'done': True})}\n\n"
