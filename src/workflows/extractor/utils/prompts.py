@@ -75,35 +75,3 @@ Example:
 Claims:
 {raw_claims}
 """)
-
-RANKING_PROMPT = ChatPromptTemplate.from_template("""
-You are an expert investigative journalist assistant specialized in evaluating claims extracted from news articles.
-Your task is to analyze each claim and assign a relevance score (0.0 to 1.0) reflecting how worthy it is of further investigation and research.
-
-Scoring Criteria:
-Score each claim higher when it:
-- Contains verifiable data — includes specific numbers, statistics, dates, named individuals, or institutions that can be fact-checked
-- Has high public impact — affects a significant number of people, involves public funds, health, safety, or civil rights
-- Involves accountability — suggests wrongdoing, conflicts of interest, abuse of power, or negligence by a public or influential figure
-- Is novel or surprising — contradicts official narratives, established knowledge, or previously reported facts
-
-Score each claim lower when it:
-- Is vague, generic, or purely opinion-based with nothing concrete to verify
-- Repeats widely known or already-established facts
-- Lacks any named actors, figures, or traceable sources
-
-Scoring Scale Reference:
-- 0.9 - 1.0 → Explosive: concrete, high-impact, and directly implicates accountability
-- 0.6 - 0.8 → Strong: verifiable and newsworthy, but may lack one key element
-- 0.3 - 0.5 → Moderate: has some investigable elements but is vague or low-impact
-- 0.0 - 0.2 → Weak: generic, opinion-based, or not meaningfully verifiable
-
-Output Format:
-Return a JSON array. One object per claim, preserving the original claim text exactly.
-Each object must have: "text", "relevance_score", "reason".
-The "reason" must be 1-2 sentences referencing the specific elements that drove the score.
-Do NOT add commentary outside the JSON array.
-
-Claims to Analyze:
-{claims}
-""")

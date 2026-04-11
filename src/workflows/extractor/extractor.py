@@ -2,8 +2,8 @@ from langgraph.graph import StateGraph, END
 from langchain_core.callbacks import adispatch_custom_event
 from typing import TypedDict, Dict, List, Any, Literal
 
-from .models.output import ExtractorOutput, NormalizatorOutput, RankerOutput
-from .utils.prompts import EXTRACTION_PROMPT, NORMALIZATION_PROMPT, RANKING_PROMPT
+from .models.output import ExtractorOutput, NormalizatorOutput
+from .utils.prompts import EXTRACTION_PROMPT, NORMALIZATION_PROMPT
 from src.workflows.orquestrator.models.claim import Claim
 from src.llm.ollama import Ollama
 
@@ -44,7 +44,6 @@ class Extractor:
 
         graph.add_node("extraction", self._claims_extraction_node)
         graph.add_node("normalization", self._claims_normalization)
-        graph.add_node("ranking", self._claims_ranking)
 
         graph.set_entry_point("extraction")
         graph.add_conditional_edges(
@@ -55,8 +54,7 @@ class Extractor:
                 "end": END
             }
         )
-        graph.add_edge("normalization", "ranking")
-        graph.set_finish_point("ranking")
+        graph.set_finish_point("normalization")
 
         return graph.compile()
     
@@ -85,7 +83,6 @@ class Extractor:
             data = {
                 "claims": response_data.get("claims", []),
             }
-
         await adispatch_custom_event(
             "progress", 
             {
@@ -141,64 +138,20 @@ class Extractor:
                 "claims": response_data.get("claims", []),
             }
 
+        normalized_claims = [Claim(text=text, relevance_score=None) for text in data["claims"]]
+
         await adispatch_custom_event(
-            "progress", 
+            "progress",
             {
                 "type": "SUCCESS",
-                "message": f"{len(data['claims'])} claims after normalization",
-                "claims_amount": len(data["claims"])
+                "message": f"{len(normalized_claims)} claims after normalization",
+                "claims_amount": len(normalized_claims)
             }
         )
 
         return {
-            "raw_claims": data["claims"]
-        }
-
-    async def _claims_ranking(self, state: State) -> Dict[str, Any]:
-        """
-        Handles claims ranking by relevance and string preparation to be a 'Claim' object.
-
-        Args:
-            state (State): Graph state.
-        Returns:
-            dict[str, any]: Dictionary containing the properties to update in the global state.
-        """
-        await adispatch_custom_event(
-            "progress", 
-            {
-                "type": "INFO",
-                "message": "Ranking claims by relevance...",
-            }
-        )
-
-        response = await self.gemma.ainvoke_model(prompt=RANKING_PROMPT,
-                                                  output_schema=RankerOutput,
-                                                  input={"claims": state["claims"]})
-        
-        if isinstance(response, RankerOutput):
-            data = {
-                "claims": response.claims
-            }
-        elif isinstance(response, dict) and response.get("error"):
-            data = {"claims": []}
-        else:
-            response_data = response.model_dump()
-            data = {
-                "claims": response_data.get("claims", []),
-            }
-
-        sorted_claims = sorted(data["claims"], key=lambda x: x.relevance_score, reverse=True)
-
-        await adispatch_custom_event(
-            "progress", 
-            {
-                "type": "SUCCESS",
-                "message": "Claims have been ranked and sorted",
-            }
-        )
-
-        return {
-            "claims": [Claim(text=claim.text, relevance_score=claim.relevance_score) for claim in sorted_claims]
+            "raw_claims": data["claims"],
+            "claims": normalized_claims,
         }
 
     async def run(self, text: str) -> List[Claim]:

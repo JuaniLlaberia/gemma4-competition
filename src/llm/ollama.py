@@ -105,9 +105,9 @@ class Ollama:
     async def aextract_text_from_image(self, b64_image: str) -> str:
         """
         Extracts text from a base64 encoded image using the vision model.
-        
+
         Args:
-            b64_image: The base64 string of the image.
+            b64_image: Base64 string or data URL (data:<mime>;base64,...) of the image.
         Returns:
             The extracted text, or 'NO_TEXT' if no text is found.
         """
@@ -117,13 +117,20 @@ class Ollama:
             "Do not include any preambles, explanations, or markdown blocks. "
             "If there is no text in the image, return exactly the string 'NO_TEXT'."
         )
-        
+
+        if b64_image.startswith("data:"):
+            header, _, raw_b64 = b64_image.partition(";base64,")
+            mime_type = header[len("data:"):]
+        else:
+            mime_type = "image/jpeg"
+            raw_b64 = b64_image
+
         message = HumanMessage(
             content=[
                 {"type": "text", "text": PROMPT_TEXT},
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
+                    "image_url": {"url": f"data:{mime_type};base64,{raw_b64}"},
                 },
             ]
         )

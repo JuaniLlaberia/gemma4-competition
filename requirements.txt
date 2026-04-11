@@ -11,3 +11,4 @@ langchain_community
 docling
 langchain-docling
 langchain-text-splitters
+faiss-cpu

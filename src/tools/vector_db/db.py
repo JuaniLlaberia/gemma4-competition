@@ -1,3 +1,6 @@
+import base64
+import os
+import tempfile
 import threading
 from typing import Optional
 
@@ -87,34 +90,70 @@ class VectorStoreManager:
         with self._rw_lock:
             return self._db.add_documents(documents)
 
-    def process_and_add_documents(self, file_paths: list[str]) -> list[str]:
+    # MIME types that docling handles via temp files
+    _DOCLING_MIME_TO_EXT: dict[str, str] = {
+        "application/pdf": ".pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+        "text/html": ".html",
+    }
+
+    def process_and_add_documents(self, data_urls: list[str]) -> list[str]:
         """
-        Extracts content from physical files using Docling, splits the text into chunks,
-        and adds them to the vector store.
+        Accepts base64 data URLs or plain file paths.
+
+        - Text-based content (text/* or unknown MIME that decodes as UTF-8)
+          is loaded directly as Document objects without docling.
+        - Binary document formats (PDF, DOCX, HTML) are written to temp
+          files and processed through DoclingLoader.
+        - Temp files are removed after processing.
         """
         self._assert_ready()
-        
-        all_splits = []
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=75,
-        )
 
-        for file_path in file_paths:
-            loader = DoclingLoader(file_path)
-            docs = loader.load()
-            splits = text_splitter.split_documents(docs)
-            all_splits.extend(splits)
-            
-        if not all_splits:
-            return []
-            
-        return self.add_documents(all_splits)
+        all_splits: list[Document] = []
+        temp_paths: list[str] = []
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=75)
+
+        try:
+            for entry in data_urls:
+                if entry.startswith("data:"):
+                    header, _, raw_b64 = entry.partition(";base64,")
+                    mime_type = header[len("data:"):]
+                    raw_bytes = base64.b64decode(raw_b64)
+
+                    if mime_type in self._DOCLING_MIME_TO_EXT:
+                        ext = self._DOCLING_MIME_TO_EXT[mime_type]
+                        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                            tmp.write(raw_bytes)
+                            temp_paths.append(tmp.name)
+                        loader = DoclingLoader(temp_paths[-1])
+                        docs = loader.load()
+                    else:
+                        # Treat as plain text (covers text/plain, text/markdown,
+                        # application/octet-stream for .md/.txt, etc.)
+                        text = raw_bytes.decode("utf-8", errors="replace")
+                        docs = [Document(page_content=text)]
+                else:
+                    loader = DoclingLoader(entry)
+                    docs = loader.load()
+
+                all_splits.extend(text_splitter.split_documents(docs))
+
+            if not all_splits:
+                return []
+
+            return self.add_documents(all_splits)
+
+        finally:
+            for path in temp_paths:
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
 
     def similarity_search(self, query: str, k: int = 4) -> list[Document]:
         self._assert_ready()
         return self._db.similarity_search(
-            query, k=k, filter={"_placeholder": False}
+            query, k=k, filter=lambda meta: not meta.get("_placeholder", False)
         )
 
     def save(self, path: str) -> None:
