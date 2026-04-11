@@ -93,12 +93,28 @@ registerRenderer("user_input", (data) => {
   );
 });
 
+/**
+ * Replaces the spinner in a progress element with a static icon based on its type.
+ * @param {HTMLElement} el
+ */
+export function finalizeProgressEl(el) {
+  const spinnerEl = el.querySelector("svg.animate-spin");
+  if (!spinnerEl) return;
+  const type = el.dataset.progressType ?? "INFO";
+  const icon = document.createElement("span");
+  icon.className = "shrink-0 leading-none select-none";
+  icon.textContent = type === "SUCCESS" ? "✅" : "ℹ️";
+  spinnerEl.replaceWith(icon);
+}
+
 registerRenderer("progress", (data) => {
   const d = /** @type {import('./types').SSEProgressEvent} */ (data);
-  return makeEl(
+  const el = makeEl(
     "flex items-center gap-2 text-sm text-gray-400",
     `${spinner()}<span>${d.message}</span>`
   );
+  el.dataset.progressType = d.type ?? "INFO";
+  return el;
 });
 
 registerRenderer("progress_connection", (data) => {
@@ -106,22 +122,26 @@ registerRenderer("progress_connection", (data) => {
   const badge = d.connection
     ? `<span class="text-xs px-2 py-0.5 rounded-full bg-green-800 text-green-200 font-medium">Online</span>`
     : `<span class="text-xs px-2 py-0.5 rounded-full bg-red-800 text-red-200 font-medium">Offline</span>`;
-  return makeEl(
+  const el = makeEl(
     "flex items-center gap-2 text-sm text-gray-400",
     `${spinner()}<span>${d.message}</span>${badge}`
   );
+  el.dataset.progressType = d.type ?? "SUCCESS";
+  return el;
 });
 
 registerRenderer("progress_claims_count", (data) => {
   const d = /** @type {import('./types').SSEProgressEvent} */ (data);
   const badge = `<span class="text-xs px-2 py-0.5 rounded-full bg-blue-800 text-blue-200 font-medium">${d.claims_amount} claims</span>`;
-  return makeEl(
+  const el = makeEl(
     "flex items-center gap-2 text-sm text-gray-400",
     `${spinner()}<span>${d.message}</span>${badge}`
   );
+  el.dataset.progressType = d.type ?? "SUCCESS";
+  return el;
 });
 
-registerRenderer("interrupt", (data) => {
+registerRenderer("interrupt", (_data) => {
   const el = makeEl(
     "w-full bg-gray-800 border border-gray-700 rounded-xl p-5",
     `<div class="claims-editor-mount"></div>`

@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +17,16 @@ if not save_dir:
     raise RuntimeError("SAVE_FILE_DIRECTORY environment variable is not set")
 if not Path(save_dir).exists():
     raise RuntimeError(f"SAVE_FILE_DIRECTORY path does not exist: {save_dir}")
+
+# Load persisted GFCA API key from config.json into the environment if not already set
+_config_file = Path(save_dir) / "config.json"
+if _config_file.exists() and not os.environ.get("GFCA_API_KEY"):
+    try:
+        _cfg = json.loads(_config_file.read_text(encoding="utf-8"))
+        if _cfg.get("gfca_api_key"):
+            os.environ["GFCA_API_KEY"] = _cfg["gfca_api_key"]
+    except (json.JSONDecodeError, OSError):
+        pass
 
 BASE_DIR = Path(__file__).parent
 

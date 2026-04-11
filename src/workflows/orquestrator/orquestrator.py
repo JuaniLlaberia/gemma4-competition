@@ -84,7 +84,7 @@ class Orquestrator:
         extractor = Extractor(role=state["role"])
         results = await extractor.run(text=state["text"])
 
-        return {"claims": results["claims"]}
+        return {"claims": results}
 
     async def _manual_ranking_node(self, state: State) -> Dict[str, Any]:
         """

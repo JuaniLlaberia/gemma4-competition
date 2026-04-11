@@ -2,7 +2,7 @@
 /// <reference path="./types.d.ts" />
 
 import { openStream } from "./sse.js";
-import { appendMessage } from "./messages.js";
+import { appendMessage, finalizeProgressEl } from "./messages.js";
 import { initClaimsEditor } from "./claims_editor.js";
 import { downloadCSV } from "./csv.js";
 
@@ -19,6 +19,16 @@ let accumulatedClaims = [];
 
 /** @type {AbortController | null} */
 let streamController = null;
+
+/** @type {HTMLElement | null} */
+let lastProgressEl = null;
+
+function finalizeLastProgress() {
+  if (lastProgressEl) {
+    finalizeProgressEl(lastProgressEl);
+    lastProgressEl = null;
+  }
+}
 
 /** @type {string | null} */
 let apiKeySession = null;
@@ -196,22 +206,34 @@ sendBtn.addEventListener("click", async () => {
 
   streamController = new AbortController();
 
-  const form = new FormData();
-  if (text) form.append("text", text);
-  if (image) form.append("image", image);
-  form.append("role", roleContent);
-  ragFiles.forEach((f) => form.append("rag_files", f));
-  if (apiKeySession) form.append("gfca_api_key", apiKeySession);
+  /** @param {File} file @returns {Promise<string>} */
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(/** @type {string} */ (e.target?.result ?? ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /** @type {Record<string, unknown>} */
+  const body = { role: roleContent };
+  if (text) body.text = text;
+  if (image) body.image = await readFileAsBase64(image);
+  if (ragFiles.length > 0) {
+    body.docs = await Promise.all(ragFiles.map(readFileAsBase64));
+  }
 
   try {
     await openStream(
       "/analyze/",
-      form,
+      body,
       (event) => handlePhase1Event(event),
       streamController.signal
     );
   } catch (err) {
     if (/** @type {Error} */ (err).name !== "AbortError") {
+      finalizeLastProgress();
       appendMessage("error", { message: String(err) });
       setState("input");
     }
@@ -221,6 +243,7 @@ sendBtn.addEventListener("click", async () => {
 /** @param {import('./types').SSEEvent} event */
 function handlePhase1Event(event) {
   if ("interrupt" in event) {
+    finalizeLastProgress();
     threadId = event.thread_id;
     const interruptEl = appendMessage("interrupt", event);
     if (interruptEl) {
@@ -240,13 +263,14 @@ function handlePhase1Event(event) {
 
   if ("done" in event) return;
 
+  finalizeLastProgress();
   const prog = /** @type {import('./types').SSEProgressEvent} */ (event);
   if (typeof prog.connection === "boolean") {
-    appendMessage("progress_connection", prog);
+    lastProgressEl = appendMessage("progress_connection", prog);
   } else if (typeof prog.claims_amount === "number") {
-    appendMessage("progress_claims_count", prog);
+    lastProgressEl = appendMessage("progress_claims_count", prog);
   } else {
-    appendMessage("progress", prog);
+    lastProgressEl = appendMessage("progress", prog);
   }
 }
 
@@ -266,6 +290,7 @@ async function resumeAnalysis(claims) {
     );
   } catch (err) {
     if (/** @type {Error} */ (err).name !== "AbortError") {
+      finalizeLastProgress();
       appendMessage("error", { message: String(err) });
       setState("input");
     }
@@ -275,6 +300,7 @@ async function resumeAnalysis(claims) {
 /** @param {import('./types').SSEEvent} event */
 function handlePhase2Event(event) {
   if ("done" in event) {
+    finalizeLastProgress();
     const finalClaims = event.analyzed_claims ?? accumulatedClaims;
     appendMessage("done", { claims: finalClaims });
     setState("done");
@@ -282,6 +308,7 @@ function handlePhase2Event(event) {
   }
 
   if ("claim_result" in event) {
+    finalizeLastProgress();
     accumulatedClaims.push(event.claim_result);
     appendMessage("claim_result", event.claim_result);
     return;
@@ -289,11 +316,12 @@ function handlePhase2Event(event) {
 
   if ("interrupt" in event) return;
 
+  finalizeLastProgress();
   const prog = /** @type {import('./types').SSEProgressEvent} */ (event);
   if (typeof prog.connection === "boolean") {
-    appendMessage("progress_connection", prog);
+    lastProgressEl = appendMessage("progress_connection", prog);
   } else {
-    appendMessage("progress", prog);
+    lastProgressEl = appendMessage("progress", prog);
   }
 }
 
@@ -301,6 +329,7 @@ function handlePhase2Event(event) {
 
 stopBtn.addEventListener("click", () => {
   streamController?.abort();
+  finalizeLastProgress();
   if (accumulatedClaims.length > 0) {
     appendMessage("stopped", { claims: [...accumulatedClaims] });
     setState("done");
@@ -314,6 +343,7 @@ function resetToInput() {
   if (log) log.innerHTML = "";
   accumulatedClaims = [];
   threadId = null;
+  lastProgressEl = null;
   ragFiles = [];
   renderRagChips();
   clearImage();

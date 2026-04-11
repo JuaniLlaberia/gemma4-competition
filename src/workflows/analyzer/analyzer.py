@@ -67,10 +67,10 @@ class Analyzer:
         graph = StateGraph(State)
 
         graph.add_node("gfca", self._gfca_node)
-        graph.add_node("rag_router", self._rag_router)
+        graph.add_node("rag_router", lambda _state: {})
         graph.add_node("rag", self._rag_node)
         graph.add_node("claim_veredict", self._claim_veredict_node)
-        graph.add_node("analysis_router", self._analysis_router)
+        graph.add_node("analysis_router", lambda _state: {})
         graph.add_node("claim_analysis", self._claim_analysis_node)
 
         graph.add_conditional_edges(

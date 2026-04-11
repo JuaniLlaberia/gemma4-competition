@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.routes.models.role import RoleCreate
-from src.routes.frontend import ConfigUpdate
+from src.routes.models.configuration import ConfigUpdate
 
 BASE_DIR = Path(__file__).parent.parent.parent
 templates = Jinja2Templates(directory=BASE_DIR / "src" / "templates")
@@ -105,6 +105,7 @@ async def save_config(body: ConfigUpdate):
     cfg = _read_config()
     cfg["gfca_api_key"] = body.gfca_api_key
     _config_path().write_text(json.dumps(cfg), encoding="utf-8")
+    os.environ["GFCA_API_KEY"] = body.gfca_api_key
 
 @router.delete("/config/gfca-key", status_code=204)
 async def delete_gfca_key():
@@ -114,6 +115,7 @@ async def delete_gfca_key():
     cfg = _read_config()
     cfg.pop("gfca_api_key", None)
     _config_path().write_text(json.dumps(cfg), encoding="utf-8")
+    os.environ.pop("GFCA_API_KEY", None)
 
 # Shutdown route
 @router.post("/shutdown", status_code=204)

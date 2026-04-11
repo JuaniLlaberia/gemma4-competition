@@ -1,4 +1,11 @@
 import json, uuid, asyncio
+from enum import Enum
+
+def _json_default(obj):
+    if isinstance(obj, Enum):
+        return obj.value
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 from langgraph.types import Command
@@ -60,10 +67,10 @@ async def analyze_article(request: AnalysisRequest):
             if event["event"] == "on_custom_event":
                 match event["name"]:
                     case "progress":
-                        yield f"data: {json.dumps(event['data'])}\n\n"
+                        yield f"data: {json.dumps(event['data'], default=_json_default)}\n\n"
 
         state = orquestrator.graph.get_state(config)
-        yield f"data: {json.dumps({'interrupt': True, 'thread_id': thread_id, 'claims': [c.model_dump() for c in state.values['claims']]})}\n\n"
+        yield f"data: {json.dumps({'interrupt': True, 'thread_id': thread_id, 'claims': [c.model_dump(mode='json') for c in state.values['claims']]}, default=_json_default)}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -80,9 +87,9 @@ async def resume_analysis(request: ResumeRequest):
                 if event["event"] == "on_custom_event":
                     match event["name"]:
                         case "progress":
-                            yield f"data: {json.dumps(event['data'])}\n\n"
+                            yield f"data: {json.dumps(event['data'], default=_json_default)}\n\n"
                         case "claim_result":
-                            yield f"data: {json.dumps({'claim_result': event['data']})}\n\n"
+                            yield f"data: {json.dumps({'claim_result': event['data']['claim']}, default=_json_default)}\n\n"
 
             state = orquestrator.graph.get_state(config)
             yield f"data: {json.dumps({'done': True})}\n\n"

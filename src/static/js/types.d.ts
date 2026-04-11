@@ -49,6 +49,7 @@ export interface FactCheckResult {
 
 // SSE event shapes
 export interface SSEProgressEvent {
+  type: 'INFO' | 'SUCCESS';
   message: string;
   connection?: boolean;
   claims_amount?: number;

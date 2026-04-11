@@ -47,9 +47,8 @@ class Extractor:
         graph.add_node("ranking", self._claims_ranking)
 
         graph.set_entry_point("extraction")
-        graph.add_edge("extraction", "claims_router")
         graph.add_conditional_edges(
-            "claims_router",
+            "extraction",
             self._claims_amount_router,
             {
                 "continue": "normalization",
