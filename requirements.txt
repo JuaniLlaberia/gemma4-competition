@@ -7,3 +7,4 @@ langdetect
 jinja2
 python-multipart
 uvicorn
+langchain_community

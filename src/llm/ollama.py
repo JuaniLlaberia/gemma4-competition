@@ -1,7 +1,7 @@
 import os
 from langchain_ollama import ChatOllama
+from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
-
 class Ollama:
     """
     Light wrapper for a `ChatOllama` model instance.
@@ -101,3 +101,36 @@ class Ollama:
                 "error": True,
                 "error_message": str(e)
             }
+
+    async def aextract_text_from_image(self, b64_image: str) -> str:
+        """
+        Extracts text from a base64 encoded image using the vision model.
+        
+        Args:
+            b64_image: The base64 string of the image.
+        Returns:
+            The extracted text, or 'NO_TEXT' if no text is found.
+        """
+        PROMPT_TEXT = (
+            "Extract all the readable text from this image. "
+            "Only return the exact text you find in the image, preserving the original structure. "
+            "Do not include any preambles, explanations, or markdown blocks. "
+            "If there is no text in the image, return exactly the string 'NO_TEXT'."
+        )
+        
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": PROMPT_TEXT},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
+                },
+            ]
+        )
+        
+        try:
+            response = await self.llm.ainvoke([message])
+            return response.content.strip()
+        except Exception as e:
+            print(f"Error extracting text from image: {e}")
+            return "NO_TEXT"

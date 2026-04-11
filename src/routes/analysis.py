@@ -5,24 +5,46 @@ from langgraph.types import Command
 
 from .models.request import AnalysisRequest, ResumeRequest
 from src.workflows.orquestrator.orquestrator import Orquestrator
+from src.llm.ollama import Ollama
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
 orquestrator = Orquestrator()
+ollama_client = Ollama()
 
 @router.post("/")
 async def analyze_article(request: AnalysisRequest):
     """
     Endpoint to init claims extraction and analysis. It gets interrupted
-    for user claims re-ranking.
+    for user claims re-ranking. Accepts either text or image.
     """
-    if len(request.text) >= 10_000:
+    has_text = bool(request.text)
+    has_image = bool(request.image)
+    
+    if has_text == has_image:
+        return JSONResponse(
+            content={"error": "Must provide exactly one of 'text' or 'image'."}, 
+            status_code=400
+        )
+        
+    analysis_text = request.text
+    
+    if has_image:
+        extracted_text = await ollama_client.aextract_text_from_image(request.image)
+        if not extracted_text or extracted_text == "NO_TEXT":
+            return JSONResponse(
+                content={"error": "The image has no text."}, 
+                status_code=400
+            )
+        analysis_text = extracted_text
+
+    if len(analysis_text) >= 10_000:
         return JSONResponse(content={"error": "Text is too long. Must be under 10,000 characters."}, status_code=400)
 
     thread_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
 
     async def stream():
-        async for event in orquestrator.graph.astream_events({"text": request.text, "role": request.role}, config=config, version="v2"):
+        async for event in orquestrator.graph.astream_events({"text": analysis_text, "role": request.role}, config=config, version="v2"):
             if event["event"] == "on_custom_event":
                 match event["name"]:
                     case "progress":
