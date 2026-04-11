@@ -16,6 +16,7 @@ class State(TypedDict):
     role: str
     claims: List[Claim] = []
     has_connection: bool = False
+    use_rag: bool = False
     analyzed_claims: Annotated[List[AnalyzedClaim], operator.add] = []
 
 class Orquestrator:
@@ -158,7 +159,7 @@ class Orquestrator:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        analyzer = Analyzer(has_connection=state["has_connection"], role=state["role"])
+        analyzer = Analyzer(has_connection=state["has_connection"], use_rag=state.get("use_rag", False), role=state["role"])
         
         index = len(state.get("analyzed_claims", []))
         claims = state.get("claims", [])

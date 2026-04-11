@@ -6,6 +6,7 @@ class AnalysisRequest(BaseModel):
     role: str
     text: Optional[str] = None
     image: Optional[str] = None
+    docs: Optional[List[str]] = None
 
 class ResumeRequest(BaseModel):
     thread_id: str
