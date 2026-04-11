@@ -4,6 +4,7 @@ from src.workflows.orquestrator.models.claim import Claim
 
 class AnalysisRequest(BaseModel):
     text: str
+    role: str
 
 class ResumeRequest(BaseModel):
     thread_id: str

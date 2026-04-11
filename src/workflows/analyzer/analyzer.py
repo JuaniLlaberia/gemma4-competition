@@ -14,6 +14,7 @@ from .utils.prompts import CLAIM_VEREDICT_PROMPT, CLAIM_ANALYSIS_PROMPT
 class State(TypedDict):
     # Claim data
     claim: Claim
+    role: str
     fgca_results: List[FactCheckResult]
     rag_results: List[Dict[str, Any]]
     has_connection: bool
@@ -33,15 +34,19 @@ class Analyzer:
     Workflow for claims analysis and source retrieval.
 
     Attributes:
+        role (str): User role in current session.
+        has_connection (bool): Whether the user has internet connection or not.
         fgca_client (GFCAClient): Instance of FGCA to call the api for fact checking results.
         gemma (Ollama): Instance of Ollama using gemma4 models family.
         graph (StateGraph): Workflow's graph.
     """ 
-    def __init__(self, has_connection: bool = False):
+    def __init__(self, role: str, has_connection: bool = False):
         """
         Args:
             has_connection (bool): Boolean determining whether the user has internet connection or not.
+            role (str): User role in current session.
         """
+        self.role = role
         self.has_connection = has_connection
         self.gfca_client = GFCAClient(api_key=os.getenv("GFCA_API_KEY"))
         self.gemma = Ollama()
@@ -175,7 +180,8 @@ class Analyzer:
         """
         response = await self.gemma.ainvoke_model(prompt=CLAIM_VEREDICT_PROMPT,
                                             output_schema=VeredictOutput,
-                                            input={"claim": state["claim"]})
+                                            input={"claim": state["claim"],
+                                                   "role": state["role"]})
         
         if isinstance(response, VeredictOutput):
             data = {
@@ -220,6 +226,7 @@ class Analyzer:
         response = await self.gemma.ainvoke_model(prompt=CLAIM_ANALYSIS_PROMPT,
                                             output_schema=AnalysisOutput,
                                             input={"claim": state["claim"],
+                                                   "role": state["role"],
                                                    "fgca_results": state["fgca_results"],
                                                    "rag_results": state["rag_results"]})
         
@@ -266,6 +273,7 @@ class Analyzer:
         """
         initial_state = State(
             claim=claim,
+            role=self.role,
             has_connection=self.has_connection,
             rag_results=[],
             fgca_results=[],

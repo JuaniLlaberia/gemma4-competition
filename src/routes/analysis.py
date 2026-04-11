@@ -22,7 +22,7 @@ async def analyze_article(request: AnalysisRequest):
     config = {"configurable": {"thread_id": thread_id}}
 
     async def stream():
-        async for event in orquestrator.graph.astream_events({"text": request.text}, config=config, version="v2"):
+        async for event in orquestrator.graph.astream_events({"text": request.text, "role": request.role}, config=config, version="v2"):
             if event["event"] == "on_custom_event":
                 match event["name"]:
                     case "progress":

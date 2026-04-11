@@ -13,6 +13,7 @@ from src.workflows.analyzer.analyzer import Analyzer
 
 class State(TypedDict):
     text: str
+    role: str
     claims: List[Claim] = []
     has_connection: bool = False
     analyzed_claims: Annotated[List[AnalyzedClaim], operator.add] = []
@@ -71,7 +72,7 @@ class Orquestrator:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        extractor = Extractor()
+        extractor = Extractor(role=state["role"])
         results = await extractor.run(text=state["text"])
 
         return {"claims": results["claims"]}
@@ -149,7 +150,7 @@ class Orquestrator:
         Returns:
             dict[str, any]: Dictionary containing the properties to update in the global state.
         """
-        analyzer = Analyzer(has_connection=state["has_connection"])
+        analyzer = Analyzer(has_connection=state["has_connection"], role=state["role"])
         
         index = len(state.get("analyzed_claims", []))
         claims = state.get("claims", [])

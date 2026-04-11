@@ -9,6 +9,7 @@ from src.llm.ollama import Ollama
 
 class State(TypedDict):
     text: str
+    role: str
     raw_claims: List[str]
     claims: List[Claim]
 
@@ -17,13 +18,18 @@ class Extractor:
     Workflow for claims extraction.
 
     Attributes:
+        role (str): User role in current session.
         gemma (Ollama): Instance of Ollama using gemma4 models family.
         graph (StateGraph): Workflow's graph.
     """ 
-    def __init__(self):
+    def __init__(self, role: str):
         """
         Initialices Extractor workflow class.
+
+        Args:
+            role (str): User role in current session.
         """
+        self.role = role
         self.gemma = Ollama()
         self.graph = self._build_graph()
 
@@ -66,7 +72,8 @@ class Extractor:
         """
         response = await self.gemma.ainvoke_model(prompt=EXTRACTION_PROMPT,
                                                   output_schema=ExtractorOutput,
-                                                  input={"text": state["text"]})
+                                                  input={"text": state["text"],
+                                                         "role": state["role"]})
         
         if isinstance(response, ExtractorOutput):
             data = {
@@ -190,6 +197,7 @@ class Extractor:
         """
         initial_state = State(
             text=text,
+            role=self.role,
             raw_claims=[],
             claims=[]
         )
