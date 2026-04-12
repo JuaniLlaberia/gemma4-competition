@@ -67,10 +67,16 @@ Example:
 - Remove incomplete or malformed claims
 - Ensure each claim is a complete, standalone statement
 
-5. Output constraints
-- Return a list of normalized claims
-- Each claim must be a single sentence
-- Do NOT include explanations or additional text
+5. Search Query Generation
+- For each claim, formulate an optimized 2-5 word `search_query`.
+- Include ONLY the most vital core entities, locations, names, and key verbs.
+- Omit all stop words (the, is, at, which, on), adjectives, adverbs, and punctuation.
+- This query targets a strict traditional search engine index (Google Fact Check API).
+
+6. Output constraints
+- Return a list of normalized claims containing the `text` and `search_query`.
+- Each claim `text` must be a single standalone sentence.
+- Do NOT include explanations or additional text.
 
 Claims:
 {raw_claims}
