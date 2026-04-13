@@ -1,6 +1,5 @@
 import os
 import json
-import signal
 from pathlib import Path
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
@@ -128,10 +127,3 @@ async def delete_gfca_key():
     _config_path().write_text(json.dumps(cfg), encoding="utf-8")
     os.environ.pop("GFCA_API_KEY", None)
 
-# Shutdown route
-@router.post("/shutdown", status_code=204)
-async def shutdown():
-    """
-    Endpoint to shutdown the server.
-    """
-    os.kill(os.getpid(), signal.SIGKILL)

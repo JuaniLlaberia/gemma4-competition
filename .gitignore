@@ -4,3 +4,7 @@
 node_modules
 data
 tailwindcss
+
+# Local build artifacts (bundle-linux.sh output)
+bundle-linux.sh
+dist/
