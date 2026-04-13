@@ -130,13 +130,13 @@ class Analyzer:
             {
                 "type": "INFO",
                 "claim": state["claim"].text,
-                "message": "Retrieving evidence from Google Fact Check...",
+                "message": f"Retrieving evidence from Google Fact Check for keywords: '{state['claim'].search_query}'...",
             }
         )
 
         try:
             results = await self.gfca_client.search(
-                query=state["claim"].text,
+                query=state["claim"].search_query,
                 language_code=language
             )
 

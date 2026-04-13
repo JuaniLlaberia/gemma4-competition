@@ -38,8 +38,6 @@ function finalizeLastProgress() {
 
 /** @type {string | null} */
 let apiKeySession = null;
-/** @type {boolean} */
-let apiKeyPersisted = false;
 
 // ── Role state ────────────────────────────────────────────────────────────────
 
@@ -98,7 +96,17 @@ textInput.addEventListener("input", () => {
   updateSendBtn();
 });
 
+textInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    if (!sendBtn.disabled && appState === "input") {
+      sendBtn.click();
+    }
+  }
+});
+
 imageToggleBtn.addEventListener("click", () => {
+  if (appState !== "input") return;
   if (inputModeState === "text") {
     inputModeState = "image";
     textMode.classList.add("hidden");
@@ -146,7 +154,10 @@ function setImage(file) {
   updateSendBtn();
 }
 
-ragAttachBtn.addEventListener("click", () => ragFileInput.click());
+ragAttachBtn.addEventListener("click", () => {
+  if (appState !== "input") return;
+  ragFileInput.click();
+});
 ragFileInput.addEventListener("change", () => {
   const files = Array.from(ragFileInput.files ?? []);
   ragFiles.push(...files);
@@ -163,7 +174,7 @@ function renderRagChips() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
           ${f.name}
-          <button class="text-gray-600 hover:text-red-400 transition-colors cursor-pointer ml-0.5" data-rag-idx="${i}">✕</button>
+          <button class="rag-remove-btn ${appState !== 'input' ? 'hidden' : ''} text-gray-600 hover:text-red-400 transition-colors cursor-pointer ml-0.5" data-rag-idx="${i}">✕</button>
         </span>`
     )
     .join("");
@@ -193,7 +204,15 @@ function setState(next) {
   textInput.disabled = blocked;
   imageToggleBtn.disabled = blocked;
   ragAttachBtn.disabled = blocked;
+  if (apiKeyBtn) /** @type {HTMLButtonElement} */ (apiKeyBtn).disabled = blocked;
+  if (roleBtn) /** @type {HTMLButtonElement} */ (roleBtn).disabled = blocked;
   textInput.classList.toggle("opacity-40", blocked);
+
+  removeImageBtn.classList.toggle("hidden", blocked);
+  document.querySelectorAll(".rag-remove-btn").forEach((btn) => {
+    btn.classList.toggle("hidden", blocked);
+  });
+
   updateSendBtn();
 }
 
@@ -205,6 +224,7 @@ function switchToChat() {
   if (chatMode) return;
   chatMode = true;
   document.getElementById("top-spacer")?.classList.add("hidden");
+  document.getElementById("bottom-spacer")?.classList.add("hidden");
   document.getElementById("welcome-text")?.classList.add("hidden");
   document.getElementById("chat-screen")?.classList.remove("hidden");
 }
@@ -437,6 +457,7 @@ stopBtn.addEventListener("click", () => {
 function resetToInput() {
   chatMode = false;
   document.getElementById("top-spacer")?.classList.remove("hidden");
+  document.getElementById("bottom-spacer")?.classList.remove("hidden");
   document.getElementById("welcome-text")?.classList.remove("hidden");
   document.getElementById("chat-screen")?.classList.add("hidden");
 
@@ -488,10 +509,8 @@ const apiKeyModalClose  = document.getElementById("api-key-modal-close");
 const modalApiKeyForm   = document.getElementById("modal-api-key-form");
 const modalApiKeyDisplay = document.getElementById("modal-api-key-display");
 const modalApiKeyInput  = /** @type {HTMLInputElement} */ (document.getElementById("modal-api-key-input"));
-const modalApiKeyRemember = /** @type {HTMLInputElement} */ (document.getElementById("modal-api-key-remember"));
 const modalApiKeySave   = document.getElementById("modal-api-key-save");
 const modalApiKeyMasked = document.getElementById("modal-api-key-masked");
-const modalApiKeyNote   = document.getElementById("modal-api-key-note");
 const modalApiKeyClear  = document.getElementById("modal-api-key-clear");
 
 function syncApiKeyModal() {
@@ -499,16 +518,15 @@ function syncApiKeyModal() {
     modalApiKeyForm?.classList.add("hidden");
     modalApiKeyDisplay?.classList.remove("hidden");
     if (modalApiKeyMasked) modalApiKeyMasked.textContent = "••••••••" + apiKeySession.slice(-4);
-    if (modalApiKeyNote) modalApiKeyNote.textContent = apiKeyPersisted ? "Saved to disk" : "Session only";
   } else {
     modalApiKeyForm?.classList.remove("hidden");
     modalApiKeyDisplay?.classList.add("hidden");
     if (modalApiKeyInput) modalApiKeyInput.value = "";
-    if (modalApiKeyRemember) modalApiKeyRemember.checked = false;
   }
 }
 
 apiKeyBtn?.addEventListener("click", () => {
+  if (appState !== "input") return;
   syncApiKeyModal();
   apiKeyModal?.classList.remove("hidden");
 });
@@ -520,15 +538,11 @@ apiKeyModal?.addEventListener("click", (e) => {
 modalApiKeySave?.addEventListener("click", async () => {
   const key = modalApiKeyInput?.value.trim();
   if (!key) return;
-  const remember = modalApiKeyRemember?.checked ?? false;
-  apiKeyPersisted = remember;
-  if (remember) {
-    await fetch("/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gfca_api_key: key }),
-    });
-  }
+  await fetch("/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gfca_api_key: key }),
+  });
   apiKeySession = key;
   syncApiKeyModal();
 });
@@ -536,7 +550,6 @@ modalApiKeySave?.addEventListener("click", async () => {
 modalApiKeyClear?.addEventListener("click", async () => {
   await fetch("/config/gfca-key", { method: "DELETE" });
   apiKeySession = null;
-  apiKeyPersisted = false;
   syncApiKeyModal();
   apiKeyModal?.classList.add("hidden");
 });
@@ -548,7 +561,6 @@ modalApiKeyClear?.addEventListener("click", async () => {
     const cfg = await res.json();
     if (cfg.gfca_api_key) {
       apiKeySession = cfg.gfca_api_key;
-      apiKeyPersisted = true;
     }
   } catch { /* ignore */ }
 })();
@@ -661,6 +673,7 @@ function renderRoleModal(roles) {
 }
 
 roleBtn?.addEventListener("click", () => {
+  if (appState !== "input") return;
   if (modalRoleCreateForm) modalRoleCreateForm.classList.add("hidden");
   if (modalRoleShowCreate) modalRoleShowCreate.classList.remove("hidden");
   if (modalNewRoleError) modalNewRoleError.classList.add("hidden");

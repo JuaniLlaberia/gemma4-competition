@@ -181,6 +181,7 @@ class Orquestrator:
         
         analyzed_claim = AnalyzedClaim(
             text=claim.text,
+            search_query=claim.search_query,
             relevance_score=claim.relevance_score,
             veredict=analyzer_result["veredict"],
             confidence=analyzer_result["confidence"],

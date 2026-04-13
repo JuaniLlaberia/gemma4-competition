@@ -138,7 +138,12 @@ class Extractor:
                 "claims": response_data.get("claims", []),
             }
 
-        normalized_claims = [Claim(text=text, relevance_score=None) for text in data["claims"]]
+        normalized_claims = []
+        for c in data["claims"]:
+            if isinstance(c, dict):
+                normalized_claims.append(Claim(text=c.get("text", ""), search_query=c.get("search_query", c.get("text", "")), relevance_score=None))
+            else:
+                normalized_claims.append(Claim(text=c.text, search_query=c.search_query, relevance_score=None))
 
         await adispatch_custom_event(
             "progress",
