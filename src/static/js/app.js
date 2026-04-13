@@ -38,8 +38,6 @@ function finalizeLastProgress() {
 
 /** @type {string | null} */
 let apiKeySession = null;
-/** @type {boolean} */
-let apiKeyPersisted = false;
 
 // ── Role state ────────────────────────────────────────────────────────────────
 
@@ -511,10 +509,8 @@ const apiKeyModalClose  = document.getElementById("api-key-modal-close");
 const modalApiKeyForm   = document.getElementById("modal-api-key-form");
 const modalApiKeyDisplay = document.getElementById("modal-api-key-display");
 const modalApiKeyInput  = /** @type {HTMLInputElement} */ (document.getElementById("modal-api-key-input"));
-const modalApiKeyRemember = /** @type {HTMLInputElement} */ (document.getElementById("modal-api-key-remember"));
 const modalApiKeySave   = document.getElementById("modal-api-key-save");
 const modalApiKeyMasked = document.getElementById("modal-api-key-masked");
-const modalApiKeyNote   = document.getElementById("modal-api-key-note");
 const modalApiKeyClear  = document.getElementById("modal-api-key-clear");
 
 function syncApiKeyModal() {
@@ -522,12 +518,10 @@ function syncApiKeyModal() {
     modalApiKeyForm?.classList.add("hidden");
     modalApiKeyDisplay?.classList.remove("hidden");
     if (modalApiKeyMasked) modalApiKeyMasked.textContent = "••••••••" + apiKeySession.slice(-4);
-    if (modalApiKeyNote) modalApiKeyNote.textContent = apiKeyPersisted ? "Saved to disk" : "Session only";
   } else {
     modalApiKeyForm?.classList.remove("hidden");
     modalApiKeyDisplay?.classList.add("hidden");
     if (modalApiKeyInput) modalApiKeyInput.value = "";
-    if (modalApiKeyRemember) modalApiKeyRemember.checked = false;
   }
 }
 
@@ -544,15 +538,11 @@ apiKeyModal?.addEventListener("click", (e) => {
 modalApiKeySave?.addEventListener("click", async () => {
   const key = modalApiKeyInput?.value.trim();
   if (!key) return;
-  const remember = modalApiKeyRemember?.checked ?? false;
-  apiKeyPersisted = remember;
-  if (remember) {
-    await fetch("/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gfca_api_key: key }),
-    });
-  }
+  await fetch("/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gfca_api_key: key }),
+  });
   apiKeySession = key;
   syncApiKeyModal();
 });
@@ -560,7 +550,6 @@ modalApiKeySave?.addEventListener("click", async () => {
 modalApiKeyClear?.addEventListener("click", async () => {
   await fetch("/config/gfca-key", { method: "DELETE" });
   apiKeySession = null;
-  apiKeyPersisted = false;
   syncApiKeyModal();
   apiKeyModal?.classList.add("hidden");
 });
@@ -572,7 +561,6 @@ modalApiKeyClear?.addEventListener("click", async () => {
     const cfg = await res.json();
     if (cfg.gfca_api_key) {
       apiKeySession = cfg.gfca_api_key;
-      apiKeyPersisted = true;
     }
   } catch { /* ignore */ }
 })();
