@@ -80,6 +80,7 @@ var
   ModelPage: TInputQueryWizardPage;     // LLM model name
   SaveDirPage: TInputDirWizardPage;     // Save files directory
   LastAutoSaveDir: String;              // tracks the last auto-generated save dir default
+  OllamaDownloadPage: TDownloadWizardPage;
 
 // ---------------------------------------------------------------------------
 // Custom wizard pages
@@ -121,6 +122,13 @@ begin
   SaveDirPage.Add('');
   LastAutoSaveDir := WizardDirValue() + '\data';
   SaveDirPage.Values[0] := LastAutoSaveDir;
+
+  // Download page — used only if Ollama needs to be downloaded
+  OllamaDownloadPage := CreateDownloadPage(
+    'Downloading Ollama',
+    'Ollama is required to run GAFA. Please wait while it downloads (~170 MB).',
+    nil
+  );
 end;
 
 // ---------------------------------------------------------------------------
@@ -226,25 +234,28 @@ begin
 
   OllamaSetupPath := ExpandConstant('{tmp}\OllamaSetup.exe');
 
-  if DownloadTemporaryFile(
-    'https://ollama.com/download/OllamaSetup.exe',
-    'OllamaSetup.exe',
-    '',
-    nil
-  ) = 0 then
-  begin
-    MsgBox(
-      'Failed to download the Ollama installer.' + #13#10 +
-      'Please install Ollama manually from https://ollama.com and re-run GAFA Setup.',
-      mbError, MB_OK
-    );
-    Exit;
+  OllamaDownloadPage.Clear;
+  OllamaDownloadPage.Add('https://ollama.com/download/OllamaSetup.exe', 'OllamaSetup.exe', '');
+  OllamaDownloadPage.Show;
+  try
+    try
+      OllamaDownloadPage.Download;
+    except
+      MsgBox(
+        'Failed to download the Ollama installer.' + #13#10 +
+        'Please install Ollama manually from https://ollama.com and re-run GAFA Setup.',
+        mbError, MB_OK
+      );
+      Exit;
+    end;
+  finally
+    OllamaDownloadPage.Hide;
   end;
 
   MsgBox(
     'Ollama needs to be installed to run GAFA.' + #13#10 + #13#10 +
-    'The Ollama installer will open now.' + #13#10 +
-    'Please complete the Ollama setup, then click OK to continue.',
+    'Click OK to launch the Ollama installer.' + #13#10 +
+    'GAFA setup will continue automatically once Ollama is installed.',
     mbInformation, MB_OK
   );
 
