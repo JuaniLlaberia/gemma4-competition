@@ -9,13 +9,14 @@ from src.tools.gfca.models.result import FactCheckResult
 from src.tools.gfca.gfca import GFCAClient
 from src.utils.helper import detect_language
 from src.tools.vector_db.db import vector_store_manager
-from .models.output import AnalysisVerdict, ClaimVeredict, EvidenceItem, VeredictOutput, AnalysisOutput
-from .utils.prompts import CLAIM_VEREDICT_PROMPT, CLAIM_ANALYSIS_PROMPT
+from .models.output import AnalysisVerdict, ClaimVeredict, EvidenceItem, VeredictOutput, AnalysisOutput, SearchQueriesOutput
+from .utils.prompts import CLAIM_VEREDICT_PROMPT, CLAIM_ANALYSIS_PROMPT, SEARCH_QUERIES_PROMPT
 
 class State(TypedDict):
     # Claim data
     claim: Claim
     role: str
+    search_queries: List[str]
     fgca_results: List[FactCheckResult]
     rag_results: List[Dict[str, Any]]
     has_connection: bool
@@ -66,6 +67,7 @@ class Analyzer:
         """
         graph = StateGraph(State)
 
+        graph.add_node("generate_queries", self._generate_queries_node)
         graph.add_node("gfca", self._gfca_node)
         graph.add_node("rag_router", lambda _state: {})
         graph.add_node("rag", self._rag_node)
@@ -77,10 +79,11 @@ class Analyzer:
             START,
             self._connection_router,
             {
-                "has_connection": "gfca",
+                "has_connection": "generate_queries",
                 "no_connection": "rag_router"
             }
         )
+        graph.add_edge("generate_queries", "gfca")
         graph.add_edge("gfca", "rag_router")
         graph.add_conditional_edges(
             "rag_router",
@@ -115,9 +118,57 @@ class Analyzer:
         """
         return "has_connection" if state["has_connection"] else "no_connection"
 
+    async def _generate_queries_node(self, state: State) -> Dict[str, Any]:
+        """
+        Generates diverse search queries for the claim using the LLM.
+
+        Args:
+            state (State): Graph state.
+        Returns:
+            dict[str, any]: Dictionary containing the search_queries list to update in the state.
+        """
+        await adispatch_custom_event(
+            "progress",
+            {
+                "type": "INFO",
+                "claim": state["claim"].text,
+                "message": "Generating search queries...",
+            }
+        )
+
+        queries = [state["claim"].search_query]
+
+        try:
+            response = await self.gemma.ainvoke_model(
+                prompt=SEARCH_QUERIES_PROMPT,
+                output_schema=SearchQueriesOutput,
+                input={"claim": state["claim"].text}
+            )
+
+            if isinstance(response, SearchQueriesOutput):
+                queries.extend(response.queries)
+            elif isinstance(response, dict) and not response.get("error"):
+                queries.extend(response.get("queries", []))
+
+        except Exception:
+            pass
+
+        queries.append(state["claim"].text)
+
+        await adispatch_custom_event(
+            "progress",
+            {
+                "type": "SUCCESS",
+                "claim": state["claim"].text,
+                "message": f"{len(queries)} search queries generated",
+            }
+        )
+
+        return {"search_queries": queries}
+
     async def _gfca_node(self, state: State) -> Dict[str, Any]:
         """
-        Performs claim evidence search using FGCA API.
+        Performs claim evidence search using FGCA API with multiple queries.
 
         Args:
             state (State): Graph state.
@@ -125,23 +176,24 @@ class Analyzer:
             dict[str, any]: Dictionary containing the properties to update in the state.
         """
         language = detect_language(text=state["claim"].text)
+        queries = state["search_queries"]
         await adispatch_custom_event(
-            "progress", 
+            "progress",
             {
                 "type": "INFO",
                 "claim": state["claim"].text,
-                "message": f"Retrieving evidence from Google Fact Check for keywords: '{state['claim'].search_query}'...",
+                "message": f"Retrieving evidence from Google Fact Check with {len(queries)} queries...",
             }
         )
 
         try:
-            results = await self.gfca_client.search(
-                query=state["claim"].search_query,
+            results = await self.gfca_client.search_multiple(
+                queries=queries,
                 language_code=language
             )
 
             await adispatch_custom_event(
-                "progress", 
+                "progress",
                 {
                     "type": "SUCCESS",
                     "claim": state["claim"].text,
@@ -154,7 +206,7 @@ class Analyzer:
             }
         except Exception as e:
             await adispatch_custom_event(
-                "progress", 
+                "progress",
                 {
                     "type": "ERROR",
                     "claim": state["claim"].text,
@@ -363,6 +415,7 @@ class Analyzer:
             role=self.role,
             has_connection=self.has_connection,
             use_rag=self.use_rag,
+            search_queries=[],
             rag_results=[],
             fgca_results=[],
             veredict="uncertain",

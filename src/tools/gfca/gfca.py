@@ -2,6 +2,7 @@ import requests
 import os
 import asyncio
 
+from typing import List
 from src.tools.gfca.models.claim import ClaimReview
 from src.tools.gfca.models.result import FactCheckResult
 
@@ -145,3 +146,36 @@ class GFCAClient:
         deduped = self._deduplicate_facts(results=parsed)
 
         return deduped
+
+    async def search_multiple(
+        self,
+        queries: List[str],
+        language_code: str = "en",
+        max_age_days: int = 365 * 3,
+        page_size: int = 8,
+        publisher_filter: str = None) -> list[FactCheckResult]:
+        """
+        Search GFCA with multiple queries concurrently, then deduplicate across all results.
+
+        Args:
+            queries: List of search queries to run.
+            language_code: BCP-47 code — "en", "es", "pt", etc.
+            max_age_days: How far back to look. Default 3 years.
+            page_size: Max raw results per query.
+            publisher_filter: Pin to a specific fact-checker site.
+
+        Returns:
+            Filtered, deduplicated list of FactCheckResult across all queries.
+        """
+        raw_responses = await asyncio.gather(
+            *[self._fetch_gfca(q, language_code, max_age_days, page_size, publisher_filter) for q in queries],
+            return_exceptions=True
+        )
+
+        all_parsed = []
+        for raw in raw_responses:
+            if isinstance(raw, Exception):
+                continue
+            all_parsed.extend(self._parse_results(raw=raw))
+
+        return self._deduplicate_facts(results=all_parsed)
