@@ -33,3 +33,6 @@ class AnalysisOutput(BaseModel):
     confidence: float = Field(..., ge=0, le=1)
     evidence_used: List[EvidenceItem] = Field(..., description="List of evidence snippets used to support the analysis.")
     limitations: str = Field(..., description="Why the evidence may be insufficient, incomplete, or indirect")
+
+class SearchQueriesOutput(BaseModel):
+    queries: List[str] = Field(..., description="List of 3 to 4 diverse search queries related to the claim")

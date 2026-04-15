@@ -1,5 +1,21 @@
 from langchain_core.prompts import ChatPromptTemplate
 
+SEARCH_QUERIES_PROMPT = ChatPromptTemplate.from_template("""
+You are an expert at generating diverse search queries for fact-checking claims.
+Given a claim, generate 3 to 4 SHORT keyword queries (2-5 words each) that could help find fact-checks related to this claim.
+
+Rules:
+- Each query should approach the claim from a DIFFERENT angle: broader terms, related concepts, key entities, alternative phrasings.
+- Vary the specificity: some queries should be broader, others more focused on specific details.
+- Queries must be optimized for a search engine index (short keyword phrases, no full sentences).
+- Omit stop words (the, is, at, which, on), adjectives, adverbs, and punctuation.
+- Do NOT repeat the original claim verbatim as a query.
+- The queries MUST be in the SAME language as the claim.
+
+Claim:
+{claim}
+""")
+
 CLAIM_VEREDICT_PROMPT = ChatPromptTemplate.from_template("""
 You are an assistant that evaluates claims using ONLY internal knowledge.
 The user interacting with you is acting as a {role}.
