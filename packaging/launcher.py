@@ -37,8 +37,8 @@ ASSETS_DIR = INSTALL_DIR / "assets"
 ICON_32 = ASSETS_DIR / "icon-32.png"
 
 HEALTH_ENDPOINT = "/health/"
-POLL_INTERVAL = 0.5   # seconds between /health/ polls
-POLL_TIMEOUT = 60     # seconds to wait for server to come up
+POLL_INTERVAL = 0.5   # seconds between polls
+POLL_TIMEOUT = 90     # seconds to wait for server to come up
 
 _ollama_proc: subprocess.Popen | None = None  # set if launcher started it
 _server_proc: subprocess.Popen | None = None
@@ -138,16 +138,18 @@ def start_server(port: int) -> None:
 
 
 def wait_for_server(port: int) -> bool:
-    """Poll /health/ until the server responds or timeout is reached."""
+    """Poll /health/ until the server returns HTTP 200 or timeout is reached."""
     import urllib.request
-    url = f"http://127.0.0.1:{port}{HEALTH_ENDPOINT}"
+    url = f"http://localhost:{port}{HEALTH_ENDPOINT}"
     deadline = time.time() + POLL_TIMEOUT
     while time.time() < deadline:
         try:
-            urllib.request.urlopen(url, timeout=2)
-            return True
+            with urllib.request.urlopen(url, timeout=1) as resp:
+                if resp.status == 200:
+                    return True
         except Exception:
-            time.sleep(POLL_INTERVAL)
+            pass
+        time.sleep(POLL_INTERVAL)
     return False
 
 
@@ -179,6 +181,7 @@ class StatusWindow:
         self.port = port
         self.url = f"http://localhost:{port}"
         self._hidden_notified = False
+        self._poll_deadline = time.time() + POLL_TIMEOUT
 
         self.root = tk.Tk()
         self.root.title("GAFA")
@@ -260,8 +263,31 @@ class StatusWindow:
             cursor="hand2",
         ).pack(side="left")
 
+    def start_polling(self) -> None:
+        """Begin polling /health/ from the main thread via after callbacks."""
+        self.root.after(int(POLL_INTERVAL * 1000), self._poll_server)
+
+    def _poll_server(self) -> None:
+        import urllib.request
+        url = f"http://localhost:{self.port}{HEALTH_ENDPOINT}"
+        try:
+            with urllib.request.urlopen(url, timeout=1) as resp:
+                if resp.status == 200:
+                    self.set_ready()
+                    webbrowser.open(self.url)
+                    return
+        except Exception:
+            pass
+        if time.time() < self._poll_deadline:
+            self.root.after(int(POLL_INTERVAL * 1000), self._poll_server)
+        else:
+            messagebox.showerror(
+                "GAFA",
+                "The server did not start within the expected time.\n"
+                "Check that all dependencies are installed correctly.",
+            )
+
     def set_ready(self) -> None:
-        """Switch status to green 'Server running'. Must be called on main thread."""
         self._status_dot.config(fg="#22c55e")
         self._status_text.config(text="  Server running", fg="#e5e7eb")
         self._open_btn.config(
@@ -305,18 +331,20 @@ def main() -> None:
 
     window = StatusWindow(port)
 
-    def _open_when_ready() -> None:
-        if wait_for_server(port):
-            window.root.after(0, window.set_ready)
-            webbrowser.open(f"http://localhost:{port}")
-        else:
-            window.root.after(0, lambda: messagebox.showerror(
-                "GAFA",
-                "The server did not start within the expected time.\n"
-                "Check that all dependencies are installed correctly.",
-            ))
-
-    threading.Thread(target=_open_when_ready, daemon=True).start()
+    if sys.platform == "win32":
+        def _open_when_ready() -> None:
+            if wait_for_server(port):
+                window.root.after(0, window.set_ready)
+                webbrowser.open(f"http://localhost:{port}")
+            else:
+                window.root.after(0, lambda: messagebox.showerror(
+                    "GAFA",
+                    "The server did not start within the expected time.\n"
+                    "Check that all dependencies are installed correctly.",
+                ))
+        threading.Thread(target=_open_when_ready, daemon=True).start()
+    else:
+        window.start_polling()
 
     window.run()
 
