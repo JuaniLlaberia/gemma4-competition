@@ -1,0 +1,7 @@
+{
+  "name": "gemma4-competition",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

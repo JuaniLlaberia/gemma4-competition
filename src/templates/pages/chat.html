@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Chat — GAFA{% endblock %}
+
+{% block content %}
+<div id="chat-page" class="flex flex-col h-screen overflow-hidden">
+
+  <!-- Main area -->
+  <div id="main-area" class="flex-1 flex flex-col min-h-0">
+
+    <!-- Spacer: pushes input-section to center in welcome state -->
+    <div id="top-spacer" class="flex-1"></div>
+
+    <!-- Chat screen: message log (hidden initially; becomes flex-1 after first send) -->
+    <div class="flex flex-col items-center flex-1 w-full min-h-0">
+      <div id="chat-screen" class="hidden flex-1 max-w-3xl w-full flex flex-col min-h-0">
+        {% include "components/message_log.html" %}
+      </div>
+    </div>
+
+    <!-- Input section: welcome text + input (always at the bottom) -->
+    <div id="input-section" class="flex flex-col items-center gap-6 shrink-0 z-10 relative">
+      <!-- Welcome text (hidden after first send) -->
+      <div id="welcome-text" class="px-6 pb-4 flex flex-col w-full max-w-3xl">
+        <h1 class="text-4xl text-white mb-2 tracking-tight text-center">What can I help you with?</h1>
+        <p class="text-md text-gray-500 text-center">Paste an article or text to fact-check</p>
+      </div>
+      {% include "components/input_area.html" %}
+    </div>
+
+    <!-- Bottom spacer: pairs with top-spacer to center content -->
+    <div id="bottom-spacer" class="flex-1 max-h-[15vh]"></div>
+
+  </div>
+</div>
+
+<!-- API Key Modal -->
+<div id="api-key-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+  <div class="bg-[#111] rounded-2xl p-6 w-full max-w-sm border border-[#222] shadow-2xl">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-base font-semibold text-white">Google Fact Check API Key</h2>
+      <button id="api-key-modal-close" class="text-gray-600 hover:text-gray-300 transition-colors cursor-pointer p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div id="modal-api-key-form" class="flex flex-col gap-3">
+      <input id="modal-api-key-input" type="password" placeholder="Enter your API key…"
+        class="w-full bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#3a3a3a]" />
+      <button id="modal-api-key-save"
+        class="w-full px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 active:scale-95 transition-all cursor-pointer">
+        Save Key
+      </button>
+    </div>
+    <div id="modal-api-key-display" class="hidden flex-col gap-3">
+      <div class="bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5">
+        <p id="modal-api-key-masked" class="text-sm font-mono text-gray-400"></p>
+      </div>
+      <button id="modal-api-key-clear"
+        class="w-full px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-white hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
+        Remove Key
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Role Modal -->
+<div id="role-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+  <div class="bg-[#111] rounded-2xl p-6 w-full max-w-lg border border-[#222] shadow-2xl flex flex-col max-h-[80vh]">
+    <div class="flex items-center justify-between mb-5 shrink-0">
+      <h2 class="text-base font-semibold text-white">Select Role</h2>
+      <button id="role-modal-close" class="text-gray-600 hover:text-gray-300 transition-colors cursor-pointer p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div id="modal-role-grid" class="flex flex-col gap-3 overflow-y-auto flex-1 min-h-0 mb-5 pr-2"></div>
+    <div id="modal-role-empty" class="hidden text-center text-gray-600 py-3 text-sm shrink-0">
+      No roles saved yet.
+    </div>
+    <div class="shrink-0">
+      <button id="modal-role-show-create"
+        class="w-full px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-gray-200 hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
+        + New Role
+      </button>
+      <div id="modal-role-create-form" class="hidden flex flex-col gap-3 mt-3">
+        <input id="modal-new-role-name" type="text" placeholder="Role name…"
+          class="w-full bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#3a3a3a]" />
+        <textarea id="modal-new-role-content" rows="3" placeholder="Instructions / perspective…"
+          class="w-full bg-[#0d0d0d] border border-[#252525] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#3a3a3a] resize-none"></textarea>
+        <div class="flex gap-3">
+          <button id="modal-new-role-save"
+            class="flex-1 px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 active:scale-95 transition-all cursor-pointer">
+            Save &amp; Select
+          </button>
+          <button id="modal-new-role-cancel"
+            class="px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-gray-200 hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
+            Cancel
+          </button>
+        </div>
+        <p id="modal-new-role-error" class="hidden text-red-400 text-xs"></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/app.js"></script>
+{% endblock %}

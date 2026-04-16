@@ -1,0 +1,15 @@
+langchain_ollama
+pydantic
+fastapi
+langgraph
+python-dotenv
+langdetect
+jinja2
+python-multipart
+uvicorn
+langchain_community
+docling
+langchain-docling
+langchain-text-splitters
+faiss-cpu
+questionary
