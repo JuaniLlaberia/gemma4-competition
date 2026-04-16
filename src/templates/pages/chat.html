@@ -1,20 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Chat — Punto Medio{% endblock %}
+{% block title %}Chat — GAFA{% endblock %}
 
 {% block content %}
 <div id="chat-page" class="flex flex-col h-screen overflow-hidden">
-
-  <!-- Top bar: exit button -->
-  <div class="flex items-center px-4 py-3 shrink-0">
-    <button id="exit-btn" title="Exit app"
-      class="flex items-center gap-1.5 text-gray-600 hover:text-gray-300 transition-colors cursor-pointer px-2 py-1.5 rounded-lg hover:bg-[#1a1a1a] active:scale-95">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-      <span class="text-xs font-medium">Exit</span>
-    </button>
-  </div>
 
   <!-- Main area -->
   <div id="main-area" class="flex-1 flex flex-col min-h-0">
@@ -42,32 +31,6 @@
     <!-- Bottom spacer: pairs with top-spacer to center content -->
     <div id="bottom-spacer" class="flex-1 max-h-[15vh]"></div>
 
-  </div>
-</div>
-
-<!-- Exit Confirmation Modal -->
-<div id="exit-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-  <div class="bg-[#111] rounded-2xl p-6 w-full max-w-sm border border-[#222] shadow-2xl">
-    <h2 class="text-base font-semibold text-white mb-2">Exit Punto Medio?</h2>
-    <p class="text-sm text-gray-500 mb-5">This will shut down the server. Any ongoing analysis will be lost.</p>
-    <div class="flex gap-3">
-      <button id="exit-confirm-btn"
-        class="flex-1 px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-gray-100 active:scale-95 transition-all cursor-pointer">
-        Exit
-      </button>
-      <button id="exit-cancel-btn"
-        class="px-4 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#252525] text-gray-400 hover:text-gray-200 hover:border-[#333] active:scale-95 transition-all cursor-pointer text-sm font-medium">
-        Cancel
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- Server stopped overlay -->
-<div id="server-stopped-overlay" class="hidden fixed inset-0 bg-[#0d0d0d]/95 flex items-center justify-center z-50">
-  <div class="text-center">
-    <p class="text-2xl font-semibold text-white mb-2">Server stopped.</p>
-    <p class="text-gray-500">You can close this tab.</p>
   </div>
 </div>
 

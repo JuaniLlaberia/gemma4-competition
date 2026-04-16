@@ -1,0 +1,89 @@
+name: Build Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string (e.g. 1.0.0-dev)'
+        required: false
+        default: '0.0.0-dev'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download uv.exe
+        shell: powershell
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip" `
+            -OutFile uv.zip
+          Expand-Archive uv.zip -DestinationPath packaging\windows\
+
+      - name: Build Inno Setup installer
+        shell: cmd
+        run: iscc packaging\windows\installer.iss /DAppVersion=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
+        # iscc is pre-installed on windows-latest GitHub Actions runners
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: packaging/windows/Output/GAFA-Setup.exe
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make install script executable
+        run: chmod +x packaging/install-linux.sh
+
+      - name: Bundle Linux installer archive
+        run: |
+          mkdir -p dist
+          # Bundle everything the installer needs into a single tar.gz.
+          # All paths are prefixed with gafa/ so the user extracts into a
+          # clean gafa/ directory and runs: bash gafa/install-linux.sh
+          tar -czf dist/gafa-linux.tar.gz \
+            --transform 's|^packaging/||' \
+            --transform 's|^|gafa/|' \
+            packaging/install-linux.sh \
+            packaging/post-install.py \
+            packaging/launcher.py \
+            packaging/assets \
+            requirements-base.txt \
+            requirements-cpu.txt \
+            requirements-gpu.txt \
+            src \
+            __main__.py \
+            server.py \
+            .env.example || true  # include example env if present, ignore if not
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installer
+          path: dist/gafa-linux.tar.gz
+
+  release:
+    needs: [build-windows, build-linux]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows-installer/GAFA-Setup.exe
+            linux-installer/gafa-linux.tar.gz
+          generate_release_notes: true

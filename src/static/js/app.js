@@ -73,7 +73,6 @@ const ragAttachBtn   = /** @type {HTMLButtonElement} */ (document.getElementById
 const ragFileInput   = /** @type {HTMLInputElement} */ (document.getElementById("rag-file-input"));
 const ragChips       = /** @type {HTMLElement} */ (document.getElementById("rag-chips"));
 const roleNameDisplay = /** @type {HTMLElement} */ (document.getElementById("role-name-display"));
-const serverStoppedOverlay = /** @type {HTMLElement} */ (document.getElementById("server-stopped-overlay"));
 
 // ── Input mode ────────────────────────────────────────────────────────────────
 
@@ -477,29 +476,6 @@ function resetToInput() {
 }
 
 resetBtn.addEventListener("click", () => resetToInput());
-
-// ── Exit ──────────────────────────────────────────────────────────────────────
-
-const exitBtn     = document.getElementById("exit-btn");
-const exitModal   = document.getElementById("exit-modal");
-const exitConfirmBtn = document.getElementById("exit-confirm-btn");
-const exitCancelBtn  = document.getElementById("exit-cancel-btn");
-
-exitBtn?.addEventListener("click", () => exitModal?.classList.remove("hidden"));
-exitCancelBtn?.addEventListener("click", () => exitModal?.classList.add("hidden"));
-exitModal?.addEventListener("click", (e) => {
-  if (e.target === exitModal) exitModal.classList.add("hidden");
-});
-
-exitConfirmBtn?.addEventListener("click", async () => {
-  try {
-    await fetch("/shutdown", { method: "POST" });
-  } catch {
-    // expected — server killed itself
-  }
-  try { window.close(); } catch { /* blocked by browser */ }
-  serverStoppedOverlay.classList.remove("hidden");
-});
 
 // ── API Key Modal ─────────────────────────────────────────────────────────────
 

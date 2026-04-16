@@ -4,3 +4,12 @@
 node_modules
 data
 tailwindcss
+
+# Local build artifacts (bundle-linux.sh output)
+bundle-linux.sh
+dist/
+
+# Windows installer build artifacts
+packaging/windows/uv*.exe
+packaging/windows/Output/
+*.zip

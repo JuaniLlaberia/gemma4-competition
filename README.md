@@ -195,9 +195,59 @@ server/src/
 
 ## Installation
 
-> Installation instructions are not covered here. This section will be updated at a later stage.
+### Prerequisites
 
-<!-- TODO: Add installation steps -->
+- **Ollama** — required for running Gemma 4 locally. The installers will install it automatically if not already present, or you can install it manually from [ollama.com](https://ollama.com).
+- **~8 GB free disk space** — for the application, Python environment, and Ollama models.
+- **(Optional) NVIDIA GPU + CUDA 12.1** — only if you want GPU acceleration. CPU mode works on any machine.
+
+### Windows
+
+1. Download `GAFA-Setup.exe` from the [latest release](https://github.com/JuaniLlaberia/gemma4-competition/releases/latest)
+2. Run the installer — it will walk you through:
+   - Choosing an install directory
+   - Selecting **CPU** or **GPU (CUDA 12.1)** variant
+   - Setting the LLM model name (default: `gemma4:e4b`)
+   - Picking a save directory for your data
+3. The installer automatically handles Python 3.12, dependencies, Ollama, and model downloads
+4. Launch GAFA from the Start Menu or Desktop shortcut
+
+### Linux
+
+1. Download `gafa-linux.tar.gz` from the [latest release](https://github.com/JuaniLlaberia/gemma4-competition/releases/latest)
+2. Extract and run the installer:
+   ```bash
+   tar -xzf gafa-linux.tar.gz
+   bash gafa/install-linux.sh
+   ```
+3. The interactive installer will prompt you for:
+   - Install directory (default: `~/gafa`)
+   - **CPU** or **GPU (CUDA 12.1)** variant
+   - LLM model name (default: `gemma4:e4b`)
+   - Save files directory (default: `<install-dir>/data`)
+4. Launch GAFA from your application menu, desktop shortcut, or terminal:
+   ```bash
+   ~/gafa/gafa.sh
+   ```
+
+### What the installer does
+
+Both installers automate the full setup process:
+
+1. Install [uv](https://github.com/astral-sh/uv) (fast Python package manager)
+2. Install a portable Python 3.12
+3. Create a virtual environment and install all dependencies
+4. Install Ollama (if not already installed)
+5. Pull the LLM model (`gemma4:e4b`) and embedding model (`embeddinggemma`)
+6. Pre-download Docling layout/OCR models for faster first run
+7. Write the `.env` configuration file
+
+### Uninstalling
+
+- **Windows:** Use the standard Windows uninstaller (Settings > Apps)
+- **Linux:** Run `bash <install-dir>/uninstall.sh`
+
+Both uninstallers offer to remove downloaded Ollama models and Ollama itself.
 
 ---
 

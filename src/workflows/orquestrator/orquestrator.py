@@ -1,5 +1,6 @@
 import asyncio
 import operator
+import os
 from langgraph.graph import StateGraph, END
 from langgraph.types import interrupt
 from langchain_core.callbacks import adispatch_custom_event
@@ -101,15 +102,26 @@ class Orquestrator:
 
     async def _check_connection_node(self, state: State) -> Dict[str, Any]:
         """
-        Routes the graph based on user internet connection availability.
+        Checks internet connectivity only when a Google Fact Check API key is configured.
 
         Args:
             state (State): Graph state.
         Returns:
             "has_connection" | "no_connection": Route to take based on internet connection.
         """
+        if not os.getenv("GFCA_API_KEY"):
+            await adispatch_custom_event(
+                "progress",
+                {
+                    "type": "INFO",
+                    "message": "No Google Fact Check API key configured. Skipping internet check.",
+                    "connection": False
+                }
+            )
+            return {"has_connection": False}
+
         await adispatch_custom_event(
-            "progress", 
+            "progress",
             {
                 "type": "INFO",
                 "message": "Validating your internet connection...",
@@ -125,7 +137,7 @@ class Orquestrator:
             await writer.wait_closed()
 
             await adispatch_custom_event(
-                "progress", 
+                "progress",
                 {
                     "type": "SUCCESS",
                     "message": "Internet connection validated. Using Google Fact Check to enhance analysis",
@@ -137,7 +149,7 @@ class Orquestrator:
             }
         except Exception:
             await adispatch_custom_event(
-                "progress", 
+                "progress",
                 {
                     "type": "INFO",
                     "message": "Internet connection failed. Skipping Google Fact Check",
