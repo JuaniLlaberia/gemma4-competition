@@ -11,15 +11,7 @@ GAFA takes any text or image, extracts verifiable claims, and cross-references t
 
 ---
 
-## Demo
-
-<!-- Replace the link below with the actual demo video or GIF -->
-
-> **Demo video coming soon.**
-
-<!-- Uncomment and replace with your actual video/gif:
-[![GAFA Demo](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
--->
+[![GAFA Demo](https://img.youtube.com/vi/SIs-T5pzd-s/maxresdefault.jpg)](https://www.youtube.com/watch?v=SIs-T5pzd-s)
 
 ---
 
