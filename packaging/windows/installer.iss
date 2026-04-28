@@ -19,7 +19,7 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
-DefaultDirName={userdocs}\{#AppName}
+DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 OutputDir=Output
 OutputBaseFilename=GAFA-Setup
@@ -29,9 +29,7 @@ SolidCompression=yes
 WizardStyle=modern
 ; Start Menu page replaced with a Tasks checkbox (item 3)
 DisableProgramGroupPage=yes
-; Allow user-level install (no admin required)
-PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+PrivilegesRequired=admin
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -129,37 +127,6 @@ begin
     'Ollama is required to run GAFA. Please wait while it downloads (~170 MB).',
     nil
   );
-end;
-
-// ---------------------------------------------------------------------------
-// Block install into protected folders that require admin rights
-// ---------------------------------------------------------------------------
-function IsProtectedPath(const Path: String): Boolean;
-begin
-  Result :=
-    (Pos(Lowercase(ExpandConstant('{pf}')),   Lowercase(Path)) = 1) or
-    (Pos(Lowercase(ExpandConstant('{pf32}')), Lowercase(Path)) = 1) or
-    (Pos(Lowercase(ExpandConstant('{win}')),  Lowercase(Path)) = 1) or
-    (Pos(Lowercase(ExpandConstant('{sys}')),  Lowercase(Path)) = 1);
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if CurPageID = wpSelectDir then
-  begin
-    if IsProtectedPath(WizardDirValue()) then
-    begin
-      MsgBox(
-        'The selected folder requires administrator permissions and cannot be used.' + #13#10 + #13#10 +
-        'Please choose a different location, for example:' + #13#10 +
-        '  ' + ExpandConstant('{userdocs}\GAFA') + #13#10 +
-        '  ' + ExpandConstant('{localappdata}\GAFA'),
-        mbError, MB_OK
-      );
-      Result := False;
-    end;
-  end;
 end;
 
 // Update the save dir default when the user navigates to that page,
